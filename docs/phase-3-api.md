@@ -159,7 +159,9 @@ This Phase 3 server is a single-tenant API: every backend token holder can acces
 the configured storage prefix. It is not a multi-user identity/RLS implementation.
 The future browser UI must not embed the server bearer token or Supabase service
 key; a trusted Next.js server boundary or per-user backend auth is required.
-Browser direct-to-storage uploads and user-owned storage policies remain Phase 4.
+The Phase 4 UI now uses a protected Next.js server route; see
+[the frontend guide](phase-4-frontend.md). Browser direct-to-storage uploads and
+user-owned storage policies remain separate integration work.
 
 Default input limit is 100 MiB and 30 seconds; request bodies get an additional
 1 MiB multipart allowance. There are at most four active API requests per analysis

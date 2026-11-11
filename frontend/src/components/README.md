@@ -1,3 +1,8 @@
-Phase 4: `capture/VideoRecorder.tsx`, `capture/VideoUpload.tsx`,
-`analysis/PoseVideo.tsx` and `analysis/ComparisonDashboard.tsx` belong here.
-Private uploads require server authorization and user-scoped storage policies.
+# Frontend components
+
+`SwingWorkspace.tsx` owns the selected clip, analysis response and playhead.
+`capture/` handles validated uploads, camera recording and cancelable analysis.
+`analysis/` renders timestamp-aligned pose overlays, metrics, charts and rule/AI
+feedback. `AppShell.tsx` provides shared navigation and settings status.
+
+See [the frontend guide](../../../docs/phase-4-frontend.md).

@@ -4,9 +4,10 @@ AI-assisted golf swing analysis using open-source pose estimation, coordinate
 math, deterministic coaching rules, and optional Bring Your Own Key (BYOK)
 OpenAI synthesis.
 
-**Current status:** Phases 1–3 are implemented and tested. The Next.js frontend is
-a working scaffold; browser capture, the comparison dashboard, and API key settings
-are planned for Phase 4. No cloud bucket is provisioned automatically.
+**Current status:** Phases 1–4 are implemented: pose processing, FastAPI, hybrid
+coaching, and a functional Next.js 15 Swing Lab with capture and BYOK settings.
+This is a single-tenant workspace. No cloud bucket is provisioned automatically;
+direct-to-bucket uploads and a pro reference library remain future integrations.
 
 ## What is implemented
 
@@ -16,13 +17,18 @@ are planned for Phase 4. No cloud bucket is provisioned automatically.
 - Rule-based posture/tempo observations with evidence and specific practice drills.
 - Optional request-scoped OpenAI coaching with rule-only fallback.
 - FastAPI video upload, private Supabase download, and existing-pose coaching routes.
-- Bounded worker processes, upload limits, temporary cleanup, and 62 passing tests.
+- Bounded worker processes, upload limits, temporary cleanup, and backend tests.
+- Camera recording, drag/drop upload, video playback and timestamp-aligned pose overlays.
+- Kinematic charts, rule/AI feedback, drills, and credential-free JSON exports.
+- Persistent browser BYOK preferences, optional AI synthesis, and a protected server proxy.
 
 The backend uses Python, FastAPI, OpenCV, Ultralytics, NumPy, and SciPy. The
-frontend scaffold uses Next.js, React, TypeScript, and Tailwind CSS.
+frontend uses Next.js 15, React 19, TypeScript, Tailwind CSS 4, and Zod.
 
 For the server, configuration, API examples and verification, see
-[Phase 3: FastAPI and hybrid coaching](docs/phase-3-api.md).
+[Phase 3: FastAPI and hybrid coaching](docs/phase-3-api.md). For the web workspace,
+settings lifecycle, deployment configuration, and file map, see
+[Phase 4: frontend](docs/phase-4-frontend.md).
 
 ## Quick start
 
@@ -49,23 +55,26 @@ token and preserves existing configuration. Configure an existing trusted pose
 checkpoint before analyzing a video; see the model download instructions below.
 Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
 
-### Frontend scaffold
+### Frontend
 
 In another terminal, from the repository root:
 
 ```sh
 cd frontend
 npm ci
+npm run setup:local
+npm test
 npm run typecheck
-npm run build
-npm run dev
+npm run dev -- --hostname 127.0.0.1
 ```
 
-Open `http://localhost:3000`. The current page is the Phase 1 scaffold; capture,
-settings, video comparison, and coaching dashboard interactions are not implemented.
+Open `http://127.0.0.1:3000`. Upload or record a swing, choose its camera view,
+and analyze. Use `/settings` to save an optional OpenAI key and enable synthesis.
+The setup helper links the private backend token without exposing it in the browser.
+Keep the backend running in the other terminal. For production, configure a workspace
+password and public origin before `npm run build` / `npm start`; see the frontend guide.
 
-The package uses Webpack for production builds because this desktop environment
-blocks the local worker ports used by Turbopack. `next dev` uses Next's default.
+Next.js 15 uses Webpack by default for these scripts.
 No remote fonts are needed to build. Secrets, local videos, generated analyses,
 model weights and dependencies are excluded by the root `.gitignore`.
 
@@ -152,9 +161,13 @@ request-scoped client. They are not written to configuration, worker jobs, model
 prompts, or results. A disabled or unavailable LLM leaves rule-based feedback
 available. Server tokens and Supabase service credentials remain server-side.
 
-The current API is single tenant. Browser direct uploads and per-user storage
-ownership remain integration work. Use HTTPS and deployment resource limits
-before exposing the service outside localhost; see the detailed Phase 3 guide.
+The API is single tenant. The frontend streams uploads through a protected Next.js
+server route. Backend/service tokens stay server-side. BYOK settings persist in
+browser localStorage, which is readable by same-origin scripts and is not an
+encrypted vault. Use a personal device and forget the saved key when finished.
+Direct-to-bucket uploads and per-user storage ownership remain integration work.
+Use HTTPS and deployment resource limits before exposing the service outside
+localhost; see the Phase 3 and Phase 4 guides.
 
 Angles are 2D camera projections. Automatic swing markers are labelled estimates,
 and COCO-17 has no club landmarks. The application does not claim measured
@@ -221,6 +234,7 @@ golf-coach/
 ├── data/.gitkeep
 ├── docs/
 │   ├── phase-3-api.md
+│   ├── phase-4-frontend.md
 │   └── vision-contract.md
 └── frontend/
     ├── .env.example
@@ -231,30 +245,41 @@ golf-coach/
     ├── package-lock.json
     ├── postcss.config.mjs
     ├── tsconfig.json
+    ├── scripts/{configure-local,smoke-web}.mjs
+    ├── tests/{settings,upload,proxy,visualization}.test.ts
     └── src/
         ├── app/
+        │   ├── api/v1/analyses/route.ts
+        │   ├── settings/page.tsx
         │   ├── globals.css
         │   ├── layout.tsx
-        │   └── page.tsx
-        ├── components/README.md
-        └── state/README.md
+        │   ├── page.tsx
+        │   ├── error.tsx
+        │   └── not-found.tsx
+        ├── components/
+        │   ├── AppShell.tsx
+        │   ├── SwingWorkspace.tsx
+        │   ├── capture/
+        │   ├── analysis/
+        │   └── ui/Icon.tsx
+        ├── lib/
+        │   ├── api-types.ts
+        │   ├── analysis-client.ts
+        │   ├── capture.ts
+        │   ├── settings-storage.ts
+        │   ├── visualization.ts
+        │   ├── workspace-auth.ts
+        │   └── server/analysis-proxy.ts
+        ├── middleware.ts
+        └── state/ApiKeyContext.tsx
 ```
 
-Reserved implementation locations, intentionally deferred:
+The complete frontend file map and operating guide are in
+[Phase 4](docs/phase-4-frontend.md). Run `npm test` and `npm run build` in
+`frontend/` to verify the browser and server-boundary code. With both development
+servers running and the backend smoke fixture prepared, `npm run smoke:web`
+exercises the complete Next.js → FastAPI → isolated YOLO upload path.
 
-```text
-frontend/src/state/ApiKeyContext.tsx        Phase 4: in-memory key and OFF-by-default toggle
-frontend/src/app/settings/page.tsx          Phase 4: BYOK settings
-frontend/src/components/capture/            Phase 4: MediaRecorder and direct upload
-frontend/src/components/analysis/           Phase 4: video comparison and pose overlay
-```
-
-The Phase 3 API accepts request-only BYOK keys and falls back to deterministic
-rules when synthesis is disabled or unavailable. The Phase 4 browser context will
-keep the key in memory. Private Supabase downloads are supported for a configured
-single tenant; browser direct uploads, user authentication/storage ownership and
-signed browser URLs remain frontend/integration work. See the Phase 3 guide for
-the implemented boundaries and deployment requirements.
 
 References: [YOLO pose](https://docs.ultralytics.com/tasks/pose/),
 [YOLOv8](https://docs.ultralytics.com/models/yolov8/),
