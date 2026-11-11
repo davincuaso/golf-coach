@@ -1,13 +1,10 @@
-Implemented Phase 3 Hybrid Coaching Engine:
+# Coaching pipeline
 
-- `kinematics.py`: event detection, tempo and camera-aware 2D metrics.
-- `rule_engine.py`: deterministic flags, evidence and rule versioning.
-- `llm_synthesizer.py`: optional OpenAI narrative using validated rule evidence.
-- `schemas.py`: validated input and output contracts, including quality flags.
+- `kinematics.py`: camera-dependent posture and timestamp-based tempo measurements.
+- `rule_engine.py`: versioned observations, evidence, notices, and drill catalog.
+- `llm_synthesizer.py`: local `generate_coaching_prompt(metrics, rules)` formatting.
+- `schemas.py`: typed contracts, including the required `prompt_payload` response.
 
-Only validated metrics may enter coaching rules. Missing values stay unknown.
-The rules work without an OpenAI key. A request-scoped key must never enter logs,
-storage, job payloads, analytics, exception output, or a shared OpenAI client.
-Do not infer real clubhead speed from body pose or uncalibrated image coordinates.
-Automatic events are explicitly estimated wrist proxies; supplied video markers
-remain the preferred input for tempo and posture screening.
+Prompt generation requires no AI SDK, credentials, or network access. Full computed
+metrics and rule evidence are preserved; long raw traces have an explicitly sampled
+preview. See [the prompt workflow](../../../docs/prompt-workflow.md).

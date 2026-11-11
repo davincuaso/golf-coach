@@ -3,10 +3,8 @@ import json
 
 from fastapi.testclient import TestClient
 import httpx
-from pydantic import SecretStr
 import pytest
 
-from app.coaching.schemas import SynthesisResult
 from app.config import Settings
 from app.errors import ServiceError
 from app.main import create_app
@@ -52,51 +50,54 @@ def test_health_openapi_authentication_and_origin_checks(client):
         headers={
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "authorization,x-openai-api-key,content-type",
+            "Access-Control-Request-Headers": "authorization,content-type",
         },
     )
     assert preflight.status_code == 200
     assert preflight.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_coaching_without_a_key_returns_metrics_rules_and_no_llm(client):
+def test_coaching_returns_metrics_rules_and_a_local_prompt(client):
     response = client.post("/api/v1/coaching", headers=AUTH, json=coaching_body(include_pose=False))
     assert response.status_code == 200
     data = response.json()
     assert data["kinematics"]["tempo_ratio"] == 3
     assert data["coaching"]["faults"][0]["code"] == "LOSS_OF_POSTURE"
-    assert data["llm"]["status"] == "disabled" and data["pose"] is None
+    assert "master golf professional" in data["prompt_payload"]
+    assert "LOSS_OF_POSTURE" in data["prompt_payload"]
+    assert "llm" not in data and data["pose"] is None
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_dynamic_key_forwarding_opt_out_and_missing_key(client, monkeypatch):
-    calls = []
-
-    async def synthesize(metrics, rules, **kwargs):
-        calls.append((kwargs["api_key"], kwargs["enabled"]))
-        return SynthesisResult(status="unavailable" if kwargs["enabled"] else "disabled")
-
-    monkeypatch.setattr("app.services.analysis.synthesize_coaching", synthesize)
-    headers = {**AUTH, "X-OpenAI-API-Key": "sk-request-only-secret"}
-    for options, enabled in (({}, True), ({"llm_enabled": False}, False)):
-        response = client.post("/api/v1/coaching", headers=headers, json=coaching_body(**options))
-        assert response.status_code == 200
-        assert "sk-request-only-secret" not in response.text
-        assert isinstance(calls[-1][0], SecretStr) and calls[-1][1] is enabled
-    response = client.post("/api/v1/coaching", headers=AUTH, json=coaching_body(llm_enabled=True))
-    assert response.status_code == 422 and response.json()["error"]["code"] == "byok_required"
-
-
-def test_invalid_headers_and_validation_errors_never_echo_secrets(client):
-    for raw in ("sk-private key", "x" * 1025):
+def test_retired_headers_are_ignored_and_never_enter_the_prompt(client):
+    for raw in ("obsolete private key", "x" * 1025):
         response = client.post(
             "/api/v1/coaching", headers={**AUTH, "X-OpenAI-API-Key": raw}, json=coaching_body()
         )
-        assert response.status_code == 400 and raw not in response.text
-    response = client.post(
-        "/api/v1/coaching", headers=AUTH, json={"vision": "sk-secret-in-invalid-input"}
+        assert response.status_code == 200
+        assert raw not in response.text
+
+
+def test_schema_exposes_prompt_generation_without_ai_options_or_headers(client):
+    schema = client.get("/openapi.json").json()
+    assert "llm_enabled" not in schema["components"]["schemas"]["AnalysisOptions"]["properties"]
+    response = schema["components"]["schemas"]["AnalysisResponse"]
+    assert "prompt_payload" in response["required"]
+    assert "llm" not in response["properties"]
+    assert "X-OpenAI-API-Key" not in json.dumps(schema)
+    assert (
+        client.post(
+            "/api/v1/coaching", headers=AUTH, json=coaching_body(llm_enabled=True)
+        ).status_code
+        == 422
     )
-    assert response.status_code == 422 and "sk-secret-in-invalid-input" not in response.text
+
+
+def test_validation_errors_do_not_echo_input(client):
+    response = client.post(
+        "/api/v1/coaching", headers=AUTH, json={"vision": "private-invalid-input"}
+    )
+    assert response.status_code == 422 and "private-invalid-input" not in response.text
 
 
 def test_upload_runs_pipeline_and_deletes_temporary_files(client, application, monkeypatch):
@@ -117,6 +118,8 @@ def test_upload_runs_pipeline_and_deletes_temporary_files(client, application, m
     )
     assert response.status_code == 200
     assert response.json()["kinematics"]["tempo_ratio"] == 3
+    assert response.json()["prompt_payload"].strip()
+    assert "private.mp4" not in response.json()["prompt_payload"]
     assert not sources[0].exists() and not sources[0].parent.exists()
 
 

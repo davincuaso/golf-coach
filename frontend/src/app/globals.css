@@ -177,7 +177,7 @@ p {
   padding: 0 40px;
   background: #fcfcf866;
 }
-.topbar > span {
+.topbar > span:first-child {
   font-size: 12px;
 }
 .page-content {
@@ -1030,47 +1030,10 @@ progress {
 .feedback-panel .status-pill {
   margin-bottom: 18px;
 }
-.coaching-summary {
-  font-family: Georgia, serif;
-  font-size: 19px;
-  line-height: 1.65;
-  letter-spacing: -0.2px;
-}
-.root-cause {
-  border-left: 2px solid #b6c7a1;
-  padding: 12px 15px;
-  background: #f3f5ed;
-  margin: 21px 0;
-}
-.root-cause .eyebrow {
-  font-size: 8px;
-}
-.root-cause > p:last-child {
-  font-size: 11px;
-  line-height: 1.8;
-  margin-top: 7px;
-  color: #64745b;
-}
-.coaching-priorities h3,
-.practice-plan h3,
 .drill-list > h3 {
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 10px;
-}
-.coaching-priorities ul {
-  padding-left: 15px;
-  margin-bottom: 20px;
-}
-.coaching-priorities li,
-.practice-plan p {
-  color: #6d7d64;
-  font-size: 11px;
-  line-height: 1.8;
-  white-space: pre-line;
-}
-.coaching-priorities li + li {
-  margin-top: 8px;
 }
 .fault-card + .fault-card {
   border-top: 1px solid var(--line);
@@ -1182,158 +1145,12 @@ progress {
 .feedback-notices p + p {
   margin-top: 8px;
 }
-.settings-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(240px, 1fr);
-  gap: 24px;
-  align-items: start;
-  max-width: 1100px;
-}
-.settings-card {
-  padding: 30px;
-}
-.section-heading {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding-bottom: 25px;
-  border-bottom: 1px solid var(--line);
-}
-.section-heading h2 {
-  font-size: 25px;
-}
-.section-heading p {
-  font-size: 11px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin-top: 6px;
-}
 .toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 25px 0;
-}
-.toggle {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  width: 42px;
-  height: 24px;
-  padding: 3px;
-  border: 0;
-  border-radius: 20px;
-  background: #d8ded1;
-}
-.toggle span {
-  display: block;
-  height: 18px;
-  width: 18px;
-  border-radius: 100%;
-  background: #fff;
-  box-shadow: 0 1px 2px #0002;
-  transition: transform 150ms;
-}
-.toggle.on {
-  background: var(--green);
-}
-.toggle.on span {
-  transform: translateX(18px);
-}
-.key-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.key-input-wrap > svg {
-  position: absolute;
-  left: 12px;
-  width: 16px;
-  height: 16px;
-  color: #87947b;
-}
-.key-input-wrap input {
-  padding-left: 36px;
-  padding-right: 48px;
-  min-height: 46px;
-}
-.key-input-wrap .icon-button {
-  position: absolute;
-  right: 5px;
-  color: #7a896e;
-}
-.notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  border: 1px solid #e1e6d6;
-  background: #f4f6ed;
-  border-radius: 6px;
-  padding: 14px;
-}
-.notice svg {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  color: #8f9f7d;
-}
-.notice p {
-  font-size: 11px;
-  color: #768469;
-  line-height: 1.8;
-}
-.settings-actions {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  margin-top: 26px;
-  padding-top: 23px;
-  border-top: 1px solid var(--line);
-  flex-wrap: wrap;
-}
-.settings-summary {
-  padding: 25px;
-}
-.settings-facts {
-  margin-top: 24px;
-}
-.settings-facts > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10px;
-  padding: 13px 0;
-  border-top: 1px solid #edf0e7;
-}
-.settings-facts dt {
-  color: #849078;
-}
-.settings-facts dd {
-  font-weight: 600;
-}
-.settings-note {
-  padding: 24px;
-  background: #e8edde;
-  border: 1px solid #dde5d1;
-  border-radius: 8px;
-  color: #718760;
-}
-.settings-note > svg {
-  margin-bottom: 17px;
-}
-.settings-note h3 {
-  font-family: Georgia, serif;
-  font-size: 24px;
-  font-weight: 400;
-  letter-spacing: -0.4px;
-  line-height: 1.4;
-  color: var(--ink);
-}
-.settings-note p {
-  font-size: 11px;
-  line-height: 1.9;
-  margin-top: 13px;
 }
 .message {
   display: flex;
@@ -1472,10 +1289,6 @@ progress {
   .metric-card .help-text {
     font-size: 8px;
   }
-  .settings-grid {
-    grid-template-columns: minmax(0, 1.7fr) minmax(210px, 1fr);
-    gap: 18px;
-  }
 }
 @media (max-width: 980px) {
   .sidebar {
@@ -1547,17 +1360,8 @@ progress {
   .metric-card .help-text {
     font-size: 10px;
   }
-  .analysis-grid,
-  .settings-grid {
+  .analysis-grid {
     grid-template-columns: 1fr;
-  }
-  .settings-grid > aside {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-  .settings-grid > aside > section {
-    margin: 0;
   }
   .page-heading > .button {
     font-size: 10px;
@@ -1621,7 +1425,7 @@ progress {
     height: 53px;
     padding: 0 20px;
   }
-  .topbar > span {
+  .topbar > span:first-child {
     font-size: 10px;
   }
   .topbar .status-pill {
@@ -1754,19 +1558,7 @@ progress {
     max-width: 140px;
     line-height: 1.6;
   }
-  .settings-grid > aside {
-    grid-template-columns: 1fr;
-  }
-  .settings-card {
-    padding: 24px;
-  }
-  .settings-page .page-heading {
-    flex-direction: column;
-    gap: 15px;
-  }
   .toggle-row .help-text,
-  .section-heading p,
-  .notice p,
   .message {
     font-size: 12px;
   }
@@ -1791,7 +1583,7 @@ progress {
   .topbar {
     padding-inline: 14px;
   }
-  .topbar > span {
+  .topbar > span:first-child {
     max-width: 110px;
     line-height: 1.5;
   }
@@ -1822,4 +1614,42 @@ progress {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+.prompt-description {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.coaching-prompt {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  resize: vertical;
+  min-height: 240px;
+  max-height: 520px;
+  background: #f7f9f2;
+  overflow-wrap: anywhere;
+}
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.prompt-actions .button-secondary {
+  font-size: 11px;
+}
+.prompt-panel {
+  scroll-margin-top: 24px;
+}
+@media (max-width: 700px) {
+  .coaching-prompt {
+    font-size: 16px;
+  }
+}
+
+.topbar .status-pill {
+  flex-shrink: 0;
 }

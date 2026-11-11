@@ -21,7 +21,6 @@ form.append(
   JSON.stringify({
     camera_view: "down_the_line",
     subject_point: document.processing.config.subject_point,
-    llm_enabled: false,
     include_pose: true,
   }),
 );
@@ -36,8 +35,9 @@ assert.equal(response.headers.get("cache-control"), "no-store");
 const result = analysisResponseSchema.parse(await response.json());
 assert.equal(result.pose.video.frame_count, 24);
 assert.equal(result.kinematics.series.length, 24);
-assert.equal(result.llm.status, "disabled");
+assert.ok(result.prompt_payload.includes("master golf professional"));
+assert.ok(!("llm" in result));
 assert.equal(result.kinematics.events, null); // A still sample is not a golf swing.
 console.log(
-  "Web smoke passed: Next.js proxy → FastAPI → isolated YOLO → 24 validated pose/chart frames; AI coaching off.",
+  "Web smoke passed: Next.js proxy → FastAPI → isolated YOLO → 24 validated pose/chart frames; local ChatGPT prompt generated.",
 );

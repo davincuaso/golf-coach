@@ -76,9 +76,6 @@ export async function proxyAnalysis(
     !request.body
   )
     return jsonError(415, "Choose a video file to analyze.");
-  const key = request.headers.get("X-OpenAI-API-Key");
-  if (key !== null && (!key || key.length > 1024 || /[^\x21-\x7E]|,/.test(key)))
-    return jsonError(400, "The OpenAI key header is invalid.");
   const configuredMax = Number(env.GOLF_MAX_VIDEO_BYTES || 104857600);
   if (
     !Number.isSafeInteger(configuredMax) ||
@@ -140,7 +137,6 @@ export async function proxyAnalysis(
     "Content-Type": contentType,
     Authorization: `Bearer ${env.GOLF_API_TOKEN}`,
   });
-  if (key) headers.set("X-OpenAI-API-Key", key);
   try {
     const options: RequestInit & { duplex: "half" } = {
       method: "POST",

@@ -1,1 +1,1 @@
-"""Evidence-based kinematics, deterministic rules and optional narrative synthesis."""
+"""Evidence-based kinematics, deterministic rules and manual coaching prompts."""

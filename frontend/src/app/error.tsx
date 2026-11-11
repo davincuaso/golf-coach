@@ -11,8 +11,8 @@ export default function ErrorPage({
       <Icon name="info" width={32} height={32} />
       <h1>Let’s try that again.</h1>
       <p>
-        The workspace could not finish loading. Your saved coaching settings are
-        still in this browser.
+        The workspace could not finish loading. Reload the workspace to try
+        again.
       </p>
       <button className="button button-primary" onClick={reset}>
         Reload workspace

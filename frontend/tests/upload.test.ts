@@ -30,13 +30,12 @@ const result: AnalysisResponse = {
     series: [],
   },
   coaching: { version: "1.0.0", faults: [], drills: [], notices: [] },
-  llm: { status: "disabled", narrative: null, reason: null },
+  prompt_payload: "Act as a master golf professional. Test-only prompt.",
 };
 const options: AnalysisOptions = {
   camera_view: "unknown",
   estimate_events: true,
   confirm_constant_frame_rate: false,
-  llm_enabled: false,
   include_pose: true,
 };
 class FakeXHR {
@@ -84,12 +83,11 @@ after(() => {
 });
 const file = new File(["test-only"], "swing.webm", { type: "video/webm" });
 
-test("the browser omits a remembered key whenever synthesis is off", async () => {
+test("browser uploads require no AI credential and return the generated prompt", async () => {
   const phases: string[] = [];
   const response = await uploadAnalysis(
     file,
     options,
-    "sk-remembered-test",
     new AbortController().signal,
     (progress) => phases.push(progress.phase),
   );
@@ -97,45 +95,17 @@ test("the browser omits a remembered key whenever synthesis is off", async () =>
   assert.equal(xhr.headers.get("X-OpenAI-API-Key"), null);
   assert.equal(xhr.headers.get("Authorization"), null);
   assert.equal(xhr.headers.get("Content-Type"), null); // Browser must generate the multipart boundary.
-  assert.equal(JSON.parse(String(xhr.body?.get("options"))).llm_enabled, false);
+  assert.ok(!("llm_enabled" in JSON.parse(String(xhr.body?.get("options")))));
+  assert.equal(response.prompt_payload, result.prompt_payload);
   assert.ok(xhr.body?.get("video") instanceof File);
   assert.deepEqual(phases, ["uploading", "analyzing"]);
   assert.equal(response.analysis_id, result.analysis_id);
-});
-test("enabled synthesis sends the dynamic key in the header, never in form data", async () => {
-  await uploadAnalysis(
-    file,
-    { ...options, llm_enabled: true },
-    "sk-request-test",
-    new AbortController().signal,
-    () => {},
-  );
-  const xhr = FakeXHR.instances.at(-1)!;
-  assert.equal(xhr.headers.get("X-OpenAI-API-Key"), "sk-request-test");
-  assert.doesNotMatch(String(xhr.body?.get("options")), /sk-request-test/);
-  await assert.rejects(
-    uploadAnalysis(
-      file,
-      { ...options, llm_enabled: true },
-      undefined,
-      new AbortController().signal,
-      () => {},
-    ),
-    /Add your OpenAI key/,
-  );
-  assert.equal(FakeXHR.instances.at(-1)!.body, null);
 });
 test("canceling an active transfer rejects with AbortError", async () => {
   FakeXHR.hold = true;
   try {
     const abort = new AbortController();
-    const promise = uploadAnalysis(
-      file,
-      options,
-      undefined,
-      abort.signal,
-      () => {},
-    );
+    const promise = uploadAnalysis(file, options, abort.signal, () => {});
     abort.abort();
     await assert.rejects(promise, { name: "AbortError" });
   } finally {
@@ -146,23 +116,36 @@ test("invalid server payloads never enter dashboard state", async () => {
   FakeXHR.response = { analysis_id: "incomplete" };
   try {
     await assert.rejects(
-      uploadAnalysis(
-        file,
-        options,
-        undefined,
-        new AbortController().signal,
-        () => {},
-      ),
+      uploadAnalysis(file, options, new AbortController().signal, () => {}),
       /incomplete/,
     );
   } finally {
     FakeXHR.response = result;
   }
   assert.equal(
+    analysisResponseSchema.safeParse({ ...result, prompt_payload: " " })
+      .success,
+    false,
+  );
+  assert.equal(
+    analysisResponseSchema.safeParse({ ...result, prompt_payload: undefined })
+      .success,
+    false,
+  );
+  assert.equal(
     analysisResponseSchema.safeParse({
       ...result,
       kinematics: { ...result.kinematics, tempo_ratio: Infinity },
     }).success,
     false,
+  );
+});
+
+test("response validation preserves prompt whitespace for exact copying", () => {
+  const prompt = "Act as a master golf professional.\nKINEMATIC_JSON\n{}\n";
+  assert.equal(
+    analysisResponseSchema.parse({ ...result, prompt_payload: prompt })
+      .prompt_payload,
+    prompt,
   );
 });

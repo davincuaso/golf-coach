@@ -1,4 +1,4 @@
-"""Server configuration. A user's OpenAI key is never an environment setting."""
+"""Server configuration for local analysis and private media access."""
 
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -26,8 +26,6 @@ class Settings(BaseSettings):
     worker_memory_mb: int = Field(default=8192, ge=1024, le=65_536)
     max_concurrent_analyses: int = Field(default=1, ge=1, le=4)
     upload_timeout_seconds: float = Field(default=60, gt=0, le=300, allow_inf_nan=False)
-    openai_model: str = Field(default="gpt-4.1-mini", min_length=1, max_length=100)
-    openai_timeout_seconds: float = Field(default=25, gt=0, le=120, allow_inf_nan=False)
     supabase_url: str | None = None
     supabase_service_key: SecretStr | None = None
     storage_bucket: str = "swings"

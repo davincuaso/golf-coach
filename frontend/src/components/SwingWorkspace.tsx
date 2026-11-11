@@ -5,6 +5,7 @@ import { CapturePanel } from "./capture/CapturePanel";
 import { SwingVideoPlayer } from "./analysis/SwingVideoPlayer";
 import { MetricCards, KinematicsPanel } from "./analysis/KinematicsPanel";
 import { CoachingFeedback } from "./analysis/CoachingFeedback";
+import { AiCoachingPrompt } from "./analysis/AiCoachingPrompt";
 import { Icon } from "./ui/Icon";
 
 export function SwingWorkspace() {
@@ -101,7 +102,10 @@ export function SwingWorkspace() {
           </div>
           <div className="analysis-grid">
             <KinematicsPanel data={result.kinematics} playhead={playhead} />
-            <CoachingFeedback result={result} />
+            <div className="space-y-5 min-w-0">
+              <AiCoachingPrompt prompt={result.prompt_payload} />
+              <CoachingFeedback result={result} />
+            </div>
           </div>
         </>
       ) : (

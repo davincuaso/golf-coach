@@ -11,7 +11,6 @@ export interface UploadProgress {
 export function uploadAnalysis(
   file: File,
   options: AnalysisOptions,
-  apiKey: string | undefined,
   signal: AbortSignal,
   onProgress: (value: UploadProgress) => void,
 ): Promise<AnalysisResponse> {
@@ -26,17 +25,6 @@ export function uploadAnalysis(
     xhr.open("POST", "/api/v1/analyses");
     xhr.timeout = 310000;
     xhr.setRequestHeader("Accept", "application/json");
-    if (options.llm_enabled) {
-      if (!apiKey) {
-        reject(
-          new Error(
-            "Add your OpenAI key in coaching settings, or switch AI coaching off.",
-          ),
-        );
-        return;
-      }
-      xhr.setRequestHeader("X-OpenAI-API-Key", apiKey);
-    }
     xhr.upload.onprogress = (event) =>
       onProgress({
         phase: "uploading",

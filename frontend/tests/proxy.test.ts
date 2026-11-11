@@ -21,44 +21,33 @@ function request(
     duplex: "half",
   } as RequestInit);
 }
-test("the proxy forwards BYOK only when supplied and keeps server authorization out of the browser", async () => {
-  for (const enabled of [false, true]) {
-    let calls = 0;
-    const fetcher: typeof fetch = async (url, init) => {
-      calls++;
-      assert.equal(String(url), "http://127.0.0.1:8000/api/v1/analyses");
-      const headers = new Headers(init?.headers);
-      assert.equal(
-        headers.get("authorization"),
-        "Bearer server-token-test-only",
-      );
-      assert.equal(
-        headers.get("X-OpenAI-API-Key"),
-        enabled ? "sk-test-only" : null,
-      );
-      assert.equal(headers.get("cookie"), null);
-      assert.equal(headers.get("origin"), null);
-      await new Response(init?.body).arrayBuffer();
-      return Response.json(
-        { ok: true },
-        { headers: { "set-cookie": "private=secret" } },
-      );
-    };
-    const response = await proxyAnalysis(
-      request({
-        cookie: "private=not-forwarded",
-        authorization: "Basic browser-credentials",
-        ...(enabled ? { "X-OpenAI-API-Key": "sk-test-only" } : {}),
-      }),
-      env,
-      fetcher,
+test("proxy strips retired AI headers and forwards only server authorization", async () => {
+  const fetcher: typeof fetch = async (url, init) => {
+    assert.equal(String(url), "http://127.0.0.1:8000/api/v1/analyses");
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("authorization"), "Bearer server-token-test-only");
+    assert.equal(headers.get("X-OpenAI-API-Key"), null);
+    assert.equal(headers.get("cookie"), null);
+    assert.equal(headers.get("origin"), null);
+    await new Response(init?.body).arrayBuffer();
+    return Response.json(
+      { prompt_payload: "local prompt" },
+      { headers: { "set-cookie": "private=secret" } },
     );
-    assert.equal(response.status, 200);
-    assert.equal(calls, 1);
-    assert.equal(response.headers.get("set-cookie"), null);
-    assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.deepEqual(await response.json(), { ok: true });
-  }
+  };
+  const response = await proxyAnalysis(
+    request({
+      cookie: "private=not-forwarded",
+      authorization: "Basic browser-credentials",
+      "X-OpenAI-API-Key": "obsolete invalid key",
+    }),
+    env,
+    fetcher,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { prompt_payload: "local prompt" });
 });
 test("authentication is enforced inside the route, independent of middleware", async () => {
   const production = {
@@ -130,13 +119,12 @@ test("Next development loopback normalization is allowed, but explicit origins s
     403,
   );
 });
-test("cross-origin, malformed keys, and oversized requests never reach the worker", async () => {
+test("cross-origin and oversized requests never reach the worker", async () => {
   const fetcher: typeof fetch = async () => {
     throw new Error("Must not reach backend");
   };
   for (const [headers, status] of [
     [{ origin: "https://elsewhere.test" }, 403],
-    [{ "X-OpenAI-API-Key": "two,keys" }, 400],
     [{ "content-length": "999999999" }, 413],
     [{ "content-type": "text/plain" }, 415],
   ] as [Record<string, string>, number][])

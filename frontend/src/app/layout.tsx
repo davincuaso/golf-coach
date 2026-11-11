@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
-import { ApiKeyProvider } from "@/state/ApiKeyContext";
+import { LegacySettingsCleanup } from "@/components/LegacySettingsCleanup";
 import { AppShell } from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +17,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ApiKeyProvider>
-          <AppShell>{children}</AppShell>
-        </ApiKeyProvider>
+        <LegacySettingsCleanup />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

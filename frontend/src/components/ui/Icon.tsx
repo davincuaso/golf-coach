@@ -13,8 +13,12 @@ export type IconName =
   | "spark"
   | "play"
   | "download"
-  | "info";
+  | "info"
+  | "copy"
+  | "external";
 const paths: Record<IconName, string> = {
+  copy: "M9 8h12v13H9zM15 8V3H3v13h6",
+  external: "M14 3h7v7m0-7L10 14M10 3H3v18h18v-7",
   flag: "M5 21V3m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0",
   grid: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
   settings: "M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6M9 15v6",

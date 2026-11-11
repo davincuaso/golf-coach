@@ -1,4 +1,4 @@
-"""Deterministic, versioned screening rules; independent of OpenAI availability."""
+"""Deterministic, versioned screening rules; independent of manual AI coaching."""
 
 from dataclasses import dataclass
 import math

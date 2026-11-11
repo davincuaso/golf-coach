@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -10,7 +9,6 @@ import {
 import { VideoUpload } from "./VideoUpload";
 import { VideoRecorder } from "./VideoRecorder";
 import { Icon } from "@/components/ui/Icon";
-import { useApiKey } from "@/state/ApiKeyContext";
 import { parseSwingMarkers, validateVideo } from "@/lib/capture";
 import { uploadAnalysis, type UploadProgress } from "@/lib/analysis-client";
 import type {
@@ -35,7 +33,6 @@ export function CapturePanel({
   onResult,
   onBusyChange,
 }: Props) {
-  const { apiKey, llmEnabled, hydrated } = useApiKey();
   const [mode, setMode] = useState<"upload" | "record">("upload");
   const [cameraView, setCameraView] = useState<CameraView>("unknown");
   const [markers, setMarkers] = useState<[string, string, string]>([
@@ -78,7 +75,7 @@ export function CapturePanel({
   );
   const analyze = async (event: FormEvent) => {
     event.preventDefault();
-    if (!file || busy || recording || !hydrated) return;
+    if (!file || busy || recording) return;
     setError(null);
     let options: AnalysisOptions;
     try {
@@ -99,17 +96,12 @@ export function CapturePanel({
           throw new Error("Choose both subject coordinates between 0 and 1.");
         point = [Number(subject[0]), Number(subject[1])];
       }
-      if (llmEnabled && !apiKey)
-        throw new Error(
-          "Add your OpenAI key in settings, or turn AI coaching off.",
-        );
       options = {
         camera_view: cameraView,
         events,
         estimate_events: !events,
         confirm_constant_frame_rate: constantRate,
         subject_point: point,
-        llm_enabled: llmEnabled,
         include_pose: true,
       };
     } catch (cause) {
@@ -127,7 +119,6 @@ export function CapturePanel({
       const result = await uploadAnalysis(
         file,
         options,
-        llmEnabled ? apiKey : undefined,
         next.signal,
         (value) => {
           if (mounted.current) setProgress(value);
@@ -323,16 +314,13 @@ export function CapturePanel({
           </fieldset>
         </details>
         <div className="coaching-mode">
-          <Icon name={llmEnabled ? "spark" : "check"} width={17} />
-          <span>
-            {llmEnabled ? "AI coaching is enabled" : "Rule-based coaching"}
-          </span>
-          <Link href="/settings">Change</Link>
+          <Icon name="spark" width={17} />
+          <span>Includes a prompt for your ChatGPT conversation</span>
         </div>
         <button
           className="button button-primary analyze-button"
           type="submit"
-          disabled={!file || busy || recording || !hydrated}
+          disabled={!file || busy || recording}
         >
           {busy ? (
             <>

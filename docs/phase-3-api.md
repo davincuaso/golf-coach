@@ -1,4 +1,4 @@
-# Phase 3: FastAPI and hybrid coaching
+# FastAPI, rule-based coaching, and prompt generation
 
 Implemented modules:
 
@@ -6,8 +6,8 @@ Implemented modules:
   measurements, timestamp-based tempo and optional wrist-event estimates.
 - `backend/app/coaching/rule_engine.py`: deterministic posture/tempo observations
   with evidence, versioned thresholds and a concrete drill catalog.
-- `backend/app/coaching/llm_synthesizer.py`: optional request-scoped OpenAI client,
-  structured response validation and graceful rule-only fallback.
+- `backend/app/coaching/llm_synthesizer.py`: deterministic, local ChatGPT prompt
+  generation using full computed metrics/rules and a bounded raw trace preview.
 - `backend/app/main.py`, `api/routes.py`, `api/middleware.py`: HTTP endpoints,
   early authorization, bounded uploads, CORS and private responses.
 - `backend/app/services/analysis.py`, `vision/worker.py`: one isolated process per
@@ -36,20 +36,19 @@ Use `GOLF_POSE_DEVICE=mps` or `0` only on a tested accelerator configuration.
 Interactive API documentation: `http://127.0.0.1:8000/docs`.
 Liveness: `GET /health`. Liveness does not certify that a model checkpoint loads.
 
-The backend token authorizes this server; it is separate from an OpenAI key.
+The backend bearer token authorizes access to this analysis service. It is not an
+AI provider key. No AI provider credentials are required.
 Every `/api/v1/*` request requires `Authorization: Bearer <backend token>`.
 The local client reads this server token from your backend settings:
 
 ```sh
 python scripts/analyze.py ../data/swing.mp4 --view down_the_line
 python scripts/analyze.py ../data/swing.mp4 --view down_the_line --events 0.3 1.2 1.5 --overwrite
-python scripts/analyze.py ../data/swing.mp4 --view down_the_line --events 0.3 1.2 1.5 --llm --overwrite
 ```
 
-`--llm` prompts for the OpenAI key with hidden input. It sends the key only in
-`X-OpenAI-API-Key`, never a command-line argument or environment variable. The
-returned analysis is saved under ignored `data/`. Use markers measured on your
-own clip; the example times are illustrative, not universal.
+The CLI saves metrics, rule-based observations, pose data, and `prompt_payload`
+under ignored `data/`. Copy the generated prompt into your own ChatGPT conversation
+when you choose. Use markers measured on your clip; example times are illustrative.
 
 ## Endpoint contracts
 
@@ -61,11 +60,10 @@ regardless of the filename or supplied MIME type.
 ```json
 {
   "camera_view": "down_the_line",
-  "events": {"start_seconds": 0.3, "top_seconds": 1.2, "impact_seconds": 1.5},
+  "events": { "start_seconds": 0.3, "top_seconds": 1.2, "impact_seconds": 1.5 },
   "estimate_events": true,
   "confirm_constant_frame_rate": false,
   "subject_point": [0.5, 0.5],
-  "llm_enabled": false,
   "include_pose": true
 }
 ```
@@ -79,7 +77,10 @@ decoder timing was unavailable; leave false for unknown or variable-rate footage
 `POST /api/v1/analyses/storage` accepts JSON:
 
 ```json
-{"object_path": "swings/session/swing.mp4", "options": {"camera_view": "down_the_line"}}
+{
+  "object_path": "swings/session/swing.mp4",
+  "options": { "camera_view": "down_the_line" }
+}
 ```
 
 Configure `GOLF_SUPABASE_URL`, `GOLF_SUPABASE_SERVICE_KEY`, `GOLF_STORAGE_BUCKET`
@@ -87,46 +88,49 @@ and `GOLF_STORAGE_PREFIX`. With bucket `swings` and prefix `swings`, that exampl
 means the object `swings/session/swing.mp4` inside bucket `swings`. The API uses a
 private authenticated download. Redirects, encoded path traversal, other prefixes
 and external URLs are rejected. The service key is only sent to the configured
-HTTPS origin, and never to OpenAI or the pose worker.
+HTTPS origin and never to the pose worker or generated prompt.
 
 `POST /api/v1/coaching` consumes existing Phase 2 JSON, avoiding repeated inference:
 
 ```json
-{"vision": {"schema_version": "1.0.0", "video": "...", "frames": "..."}, "options": {"include_pose": false}}
+{
+  "vision": { "schema_version": "1.0.0", "video": "...", "frames": "..." },
+  "options": { "include_pose": false }
+}
 ```
 
 The abbreviated `vision` object above must be replaced with actual Phase 2 output.
-Responses contain `analysis_id`, `kinematics`, `coaching`, `llm` and optionally
+Responses contain `analysis_id`, `kinematics`, `coaching`, `prompt_payload` and optionally
 `pose`. `kinematics.series` is timestamp-aligned for future charts. `pose.frames`
 contains the validated landmark data for overlays. Unused Phase 2 metadata is
 discarded in this API contract. Every response has `Cache-Control: no-store`.
 
-## LLM behavior and key lifecycle
+## Prompt generation workflow
 
-- No BYOK header: rule-only analysis; no OpenAI client is created.
-- BYOK header and no explicit toggle: synthesize the flagged evidence.
-- `llm_enabled: false`: always rule-only, even if a header was supplied.
-- `llm_enabled: true` without a header: HTTP 422 before starting processing.
-- No supported fault: synthesis is skipped, avoiding an unnecessary model call.
-- Provider refusal, invalid output, auth/rate/network error or timeout: HTTP 200
-  with completed metrics/rules, `llm.status="unavailable"` and no narrative.
+Every successful analysis returns a nonempty `prompt_payload` string, including
+analyses with no faults or insufficient data. The application makes no AI provider
+request. The former `llm` response, `llm_enabled` request option, AI model/timeout
+configuration, and provider key validation have been removed. Old clients that send
+`llm_enabled` receive HTTP 422 because the request schema rejects unknown options.
+Legacy provider headers are ignored by FastAPI and stripped by the frontend proxy.
 
-Each enabled request creates and closes its own client with the supplied key.
-There is no key field in server settings, shared client, task payload, result
-file or model prompt. The fixed OpenAI endpoint ignores environment overrides,
-and the HTTP transport ignores environment proxy settings. SDK debug logging is
-disabled. Error responses do not include validation inputs or provider exception
-text. Keys are not persisted or deliberately logged; Python cannot guarantee
-zeroization of immutable strings in process memory. Terminate TLS before exposing
-the API outside localhost, and configure proxies/APM to redact authorization and
-BYOK headers and omit request bodies.
+The prompt asks ChatGPT to act as a master golf professional, distinguish measured
+observations from tentative root-cause hypotheses, cite supplied evidence, select
+catalog drills, and propose a focused practice plan. It includes all scalar
+kinematics, flags, evidence, quality warnings, notices, and drill instructions.
+Null measurements remain null and uncertainties remain explicit.
 
-The synthesis input is a compact metric/rule/drill report, with no raw video,
-pose trace, filenames or storage paths. Structured output can reference only
-supplied fault codes and drill IDs. The API uses `store=False`; this disables
-Responses storage, not all provider-side retention policies. See the official
-[structured output guide](https://developers.openai.com/api/docs/guides/structured-outputs)
-and [Responses API](https://developers.openai.com/api/reference/resources/responses/methods/create).
+Raw kinematic samples use compact columnar JSON. Up to 121 uniformly indexed rows
+plus the samples before/after each swing event are included (at most 127). Numeric
+precision and nulls are preserved. Sampling is disclosed, and the instructions
+prohibit making quality/fault decisions from the preview alone. The original
+`kinematics.series` remains complete in the response and JSON export. Prompt size
+is bounded independently of video FPS; no pose landmarks, video, filenames,
+request headers, storage paths, or server credentials enter the prompt.
+
+The browser only opens `https://chatgpt.com` in a new tab. It does not submit data
+there. Copy/paste and sending the message are deliberate user actions. See
+[the prompt workflow and migration guide](prompt-workflow.md).
 
 ## Metric definitions and limits
 
@@ -157,9 +161,8 @@ The returned wrist speed is torso lengths per second, not clubhead speed.
 
 This Phase 3 server is a single-tenant API: every backend token holder can access
 the configured storage prefix. It is not a multi-user identity/RLS implementation.
-The future browser UI must not embed the server bearer token or Supabase service
-key; a trusted Next.js server boundary or per-user backend auth is required.
-The Phase 4 UI now uses a protected Next.js server route; see
+The browser UI does not embed the server bearer token or Supabase service
+key. It uses a protected Next.js server route; see
 [the frontend guide](phase-4-frontend.md). Browser direct-to-storage uploads and
 user-owned storage policies remain separate integration work.
 
@@ -169,7 +172,7 @@ slot. Extra analyses return 503, rather than forming an unbounded queue. Slots
 are per server process; use one API worker or coordinate capacity externally.
 Native decoding/model inference runs in a subprocess, with a wall deadline,
 CPU/file limits on POSIX and an additional address-space cap on Linux. Worker
-environments contain no server/service/BYOK credentials. Task cancellation kills
+environments contain no server/service credentials. Task cancellation kills
 the child process group and temporary folders are cleaned after success/failure.
 Clients disconnecting do not necessarily cancel an ASGI request; the hard worker
 deadline remains enforced. Temporary media and results are not retained by this
@@ -190,6 +193,7 @@ worker design. The earlier optional MediaPipe wheel metadata caveat still applie
 ../.venv/bin/python scripts/smoke_api.py
 ```
 
-The API smoke test uses a temporary token and a real YOLO subprocess. Unit tests
-exercise OpenAI's actual SDK against a mock HTTP transport, with no paid API call.
-No live Supabase credentials or user OpenAI key were used during verification.
+The API smoke test uses a temporary token and a real YOLO subprocess. Prompt tests
+block network connections and check evidence fidelity, nulls, trace bounds, event
+neighbors, and deterministic output. No AI provider package or credentials are
+needed. Private storage is tested with mock HTTP transports.

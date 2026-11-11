@@ -1,13 +1,8 @@
-"use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useApiKey } from "@/state/ApiKeyContext";
 import { Icon } from "@/components/ui/Icon";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const { llmEnabled, hydrated } = useApiKey();
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -25,24 +20,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <div className="sidebar-label">WORKSPACE</div>
         <nav aria-label="Main navigation" className="main-nav">
-          <Link
-            href="/"
-            className={pathname === "/" ? "nav-link active" : "nav-link"}
-            aria-current={pathname === "/" ? "page" : undefined}
-          >
+          <Link href="/" className="nav-link active">
             <Icon name="grid" />
             Swing Lab
             <Icon name="arrow" className="nav-arrow" width={15} />
-          </Link>
-          <Link
-            href="/settings"
-            className={
-              pathname === "/settings" ? "nav-link active" : "nav-link"
-            }
-            aria-current={pathname === "/settings" ? "page" : undefined}
-          >
-            <Icon name="settings" />
-            Coaching settings
           </Link>
         </nav>
         <div className="sidebar-bottom">
@@ -64,18 +45,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-sm text-[var(--muted)]">
             Your personal practice workspace
           </span>
-          <Link
-            href="/settings"
-            className={`status-pill ${hydrated && llmEnabled ? "status-green" : ""}`}
-          >
-            <span className="status-dot" />
-            {!hydrated
-              ? "Loading settings"
-              : llmEnabled
-                ? "AI coaching on"
-                : "Rule-based coaching"}
-            <Icon name="settings" width={14} height={14} />
-          </Link>
+          <span className="status-pill status-green">
+            <Icon name="spark" width={14} height={14} />
+            ChatGPT prompt workflow
+          </span>
         </header>
         <main id="main-content" className="page-content">
           {children}

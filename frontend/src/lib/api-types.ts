@@ -32,7 +32,6 @@ export interface AnalysisOptions {
   estimate_events: boolean;
   confirm_constant_frame_rate: boolean;
   subject_point?: [number, number];
-  llm_enabled: boolean;
   include_pose: boolean;
 }
 export interface Landmark {
@@ -106,22 +105,11 @@ export interface RuleReport {
   drills: Drill[];
   notices: string[];
 }
-export interface CoachingNarrative {
-  summary: string;
-  possible_root_cause: string | null;
-  priorities: { fault_code: string; explanation: string }[];
-  recommended_drill_ids: string[];
-  practice_plan: string;
-}
 export interface AnalysisResponse {
   analysis_id: string;
   kinematics: Kinematics;
   coaching: RuleReport;
-  llm: {
-    status: "disabled" | "complete" | "skipped" | "unavailable";
-    narrative: CoachingNarrative | null;
-    reason: string | null;
-  };
+  prompt_payload: string;
   pose: VisionDocument | null;
 }
 
@@ -193,21 +181,9 @@ export const analysisResponseSchema: z.ZodType<AnalysisResponse> = z.object({
     ),
     notices: z.array(z.string()),
   }),
-  llm: z.object({
-    status: z.enum(["disabled", "complete", "skipped", "unavailable"]),
-    reason: z.string().nullable(),
-    narrative: z
-      .object({
-        summary: z.string(),
-        possible_root_cause: z.string().nullable(),
-        priorities: z.array(
-          z.object({ fault_code: z.string(), explanation: z.string() }),
-        ),
-        recommended_drill_ids: z.array(z.string()),
-        practice_plan: z.string(),
-      })
-      .nullable(),
-  }),
+  prompt_payload: z
+    .string()
+    .refine((value) => value.trim().length > 0, "Prompt must not be blank"),
   pose: z
     .object({
       schema_version: z.literal("1.0.0"),

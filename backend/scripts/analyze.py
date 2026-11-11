@@ -1,7 +1,6 @@
-"""Local API client. BYOK is prompted privately, never passed on the command line."""
+"""Analyze a local video and save metrics, rules, and a manual ChatGPT prompt."""
 
 import argparse
-import getpass
 from pathlib import Path
 import sys
 
@@ -23,7 +22,6 @@ def main():
     )
     parser.add_argument("--events", type=float, nargs=3, metavar=("START", "TOP", "IMPACT"))
     parser.add_argument("--subject-point", type=float, nargs=2)
-    parser.add_argument("--llm", action="store_true")
     parser.add_argument("--output", type=Path, default=BACKEND.parent / "data/api.analysis.json")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
@@ -45,17 +43,11 @@ def main():
         camera_view=args.view,
         events=events,
         subject_point=tuple(args.subject_point) if args.subject_point else None,
-        llm_enabled=args.llm,
     )
     headers = {"Authorization": "Bearer " + settings.api_token.get_secret_value()}
-    if args.llm:
-        key = getpass.getpass("OpenAI key (request only; input hidden): ").strip()
-        if not key:
-            parser.error("An OpenAI key is required when --llm is selected.")
-        headers["X-OpenAI-API-Key"] = key
     with (
         httpx.Client(
-            timeout=settings.worker_timeout_seconds + settings.openai_timeout_seconds + 90,
+            timeout=settings.worker_timeout_seconds + 90,
             trust_env=False,
         ) as client,
         args.video.open("rb") as video,
@@ -71,7 +63,7 @@ def main():
         return 1
     payload = response.json()
     write_json_atomic(payload, args.output, overwrite=args.overwrite)
-    print(f"Saved analysis to {args.output}; LLM: {payload['llm']['status']}")
+    print(f"Saved analysis and coaching prompt to {args.output}.")
     return 0
 
 

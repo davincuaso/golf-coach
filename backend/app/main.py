@@ -19,10 +19,9 @@ LOGGER = logging.getLogger(__name__)
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title="Golf Coach API", version="0.3.0")
+    app = FastAPI(title="Golf Coach API", version="0.5.0")
     app.state.settings = settings
     app.state.analysis_service = AnalysisService(settings)
-    logging.getLogger("openai").setLevel(logging.WARNING)
 
     @app.exception_handler(ServiceError)
     async def service_error(request: Request, error: ServiceError):
@@ -70,7 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["health"])
     async def health():
-        return {"status": "ok", "version": "0.3.0"}
+        return {"status": "ok", "version": "0.5.0"}
 
     app.include_router(router)
     app.add_middleware(RequestGuards, settings=settings)
@@ -78,7 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_methods=["POST", "GET"],
-        allow_headers=["Authorization", "Content-Type", "X-OpenAI-API-Key"],
+        allow_headers=["Authorization", "Content-Type"],
         allow_credentials=False,
         max_age=600,
     )

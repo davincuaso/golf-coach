@@ -1,11 +1,11 @@
 # Golf Coach
 
-AI-assisted golf swing analysis using open-source pose estimation, coordinate
-math, deterministic coaching rules, and optional Bring Your Own Key (BYOK)
-OpenAI synthesis.
+Golf swing analysis using open-source pose estimation, coordinate math,
+deterministic coaching rules, and ready-to-copy prompts for your own ChatGPT
+conversation. The application does not call a paid AI API.
 
 **Current status:** Phases 1–4 are implemented: pose processing, FastAPI, hybrid
-coaching, and a functional Next.js 15 Swing Lab with capture and BYOK settings.
+coaching, and a functional Next.js 15 Swing Lab with capture and coaching prompts.
 This is a single-tenant workspace. No cloud bucket is provisioned automatically;
 direct-to-bucket uploads and a pro reference library remain future integrations.
 
@@ -15,12 +15,12 @@ direct-to-bucket uploads and a pro reference library remain future integrations.
 - Timestamp-aware Butterworth smoothing, bounded gap interpolation, and JSON export.
 - 2D spine posture measurements, swing tempo, and labelled swing-event estimates.
 - Rule-based posture/tempo observations with evidence and specific practice drills.
-- Optional request-scoped OpenAI coaching with rule-only fallback.
+- Local, structured ChatGPT prompt generation from metrics, faults, and drills.
 - FastAPI video upload, private Supabase download, and existing-pose coaching routes.
 - Bounded worker processes, upload limits, temporary cleanup, and backend tests.
 - Camera recording, drag/drop upload, video playback and timestamp-aligned pose overlays.
 - Kinematic charts, rule/AI feedback, drills, and credential-free JSON exports.
-- Persistent browser BYOK preferences, optional AI synthesis, and a protected server proxy.
+- Copy-to-clipboard coaching prompts, an Open ChatGPT link, and a protected server proxy.
 
 The backend uses Python, FastAPI, OpenCV, Ultralytics, NumPy, and SciPy. The
 frontend uses Next.js 15, React 19, TypeScript, Tailwind CSS 4, and Zod.
@@ -69,7 +69,8 @@ npm run dev -- --hostname 127.0.0.1
 ```
 
 Open `http://127.0.0.1:3000`. Upload or record a swing, choose its camera view,
-and analyze. Use `/settings` to save an optional OpenAI key and enable synthesis.
+and analyze. Copy the AI Coaching Prompt, click Open ChatGPT, and paste it into
+your conversation. No AI provider key or browser settings page is needed.
 The setup helper links the private backend token without exposing it in the browser.
 Keep the backend running in the other terminal. For production, configure a workspace
 password and public origin before `npm run build` / `npm start`; see the frontend guide.
@@ -151,23 +152,24 @@ on a short video built from Ultralytics' bundled sample image. It checks wiring,
 not golf-specific pose accuracy. A labelled golf dataset is still needed for that.
 
 The API smoke test exercises authenticated uploads through a real isolated YOLO
-worker. OpenAI and storage integrations are tested with mock transports; live
-provider credentials are not included.
+worker and verifies a generated coaching prompt. Prompt generation tests block
+network calls; private storage uses mock transports. No provider SDK is required.
 
 ## Credentials, storage, and measurement limits
 
-OpenAI keys arrive in the `X-OpenAI-API-Key` request header and are used by a
-request-scoped client. They are not written to configuration, worker jobs, model
-prompts, or results. A disabled or unavailable LLM leaves rule-based feedback
-available. Server tokens and Supabase service credentials remain server-side.
+The app generates `prompt_payload` locally and keeps rule-based feedback available
+for every analysis. No AI provider SDK, key, toggle, or synthesis API call remains.
+The dashboard exposes a read-only prompt, a copy button, and an external ChatGPT
+link. You decide when to paste and send your measurements. Existing saved browser
+keys are removed on the next app load when browser storage permits removal.
 
-The API is single tenant. The frontend streams uploads through a protected Next.js
-server route. Backend/service tokens stay server-side. BYOK settings persist in
-browser localStorage, which is readable by same-origin scripts and is not an
-encrypted vault. Use a personal device and forget the saved key when finished.
-Direct-to-bucket uploads and per-user storage ownership remain integration work.
-Use HTTPS and deployment resource limits before exposing the service outside
-localhost; see the Phase 3 and Phase 4 guides.
+The API remains single tenant. Its backend bearer token and optional private
+storage credentials stay server-side. Direct-to-bucket uploads and per-user storage
+ownership remain integration work. Use HTTPS and deployment resource limits before
+exposing the service outside localhost; see the Phase 3 and Phase 4 guides.
+
+See [the prompt workflow](docs/prompt-workflow.md) for the updated response contract,
+trace sampling, and migration from the former API-key workflow.
 
 Angles are 2D camera projections. Automatic swing markers are labelled estimates,
 and COCO-17 has no club landmarks. The application does not claim measured
@@ -235,6 +237,7 @@ golf-coach/
 ├── docs/
 │   ├── phase-3-api.md
 │   ├── phase-4-frontend.md
+│   ├── prompt-workflow.md
 │   └── vision-contract.md
 └── frontend/
     ├── .env.example
@@ -246,11 +249,10 @@ golf-coach/
     ├── postcss.config.mjs
     ├── tsconfig.json
     ├── scripts/{configure-local,smoke-web}.mjs
-    ├── tests/{settings,upload,proxy,visualization}.test.ts
+    ├── tests/{prompt,upload,proxy,visualization}.test.ts
     └── src/
         ├── app/
         │   ├── api/v1/analyses/route.ts
-        │   ├── settings/page.tsx
         │   ├── globals.css
         │   ├── layout.tsx
         │   ├── page.tsx
@@ -258,6 +260,7 @@ golf-coach/
         │   └── not-found.tsx
         ├── components/
         │   ├── AppShell.tsx
+        │   ├── LegacySettingsCleanup.tsx
         │   ├── SwingWorkspace.tsx
         │   ├── capture/
         │   ├── analysis/
@@ -266,12 +269,12 @@ golf-coach/
         │   ├── api-types.ts
         │   ├── analysis-client.ts
         │   ├── capture.ts
-        │   ├── settings-storage.ts
+        │   ├── clipboard.ts
+        │   ├── legacy-settings.ts
         │   ├── visualization.ts
         │   ├── workspace-auth.ts
         │   └── server/analysis-proxy.ts
-        ├── middleware.ts
-        └── state/ApiKeyContext.tsx
+        └── middleware.ts
 ```
 
 The complete frontend file map and operating guide are in
@@ -279,7 +282,6 @@ The complete frontend file map and operating guide are in
 `frontend/` to verify the browser and server-boundary code. With both development
 servers running and the backend smoke fixture prepared, `npm run smoke:web`
 exercises the complete Next.js → FastAPI → isolated YOLO upload path.
-
 
 References: [YOLO pose](https://docs.ultralytics.com/tasks/pose/),
 [YOLOv8](https://docs.ultralytics.com/models/yolov8/),

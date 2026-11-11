@@ -1,4 +1,4 @@
-"""Real FastAPI upload -> isolated YOLO process -> coaching smoke test; no LLM call.
+"""Real FastAPI upload -> isolated YOLO process -> coaching smoke test with a locally generated coaching prompt.
 
 Run scripts/smoke_pose.py first, then from backend/:
     ../.venv/bin/python scripts/smoke_api.py
@@ -31,7 +31,7 @@ def main():
             "/api/v1/analyses",
             headers={"Authorization": f"Bearer {token}"},
             files={"video": ("sample.avi", video, "video/x-msvideo")},
-            data={"options": json.dumps({"subject_point": subject, "llm_enabled": False})},
+            data={"options": json.dumps({"subject_point": subject})},
         )
         if response.status_code != 200:
             raise RuntimeError(
@@ -40,7 +40,8 @@ def main():
         payload = response.json()
         assert payload["pose"]["video"]["frame_count"] == 24
         assert len(payload["kinematics"]["series"]) == 24
-        assert payload["llm"]["status"] == "disabled"
+        assert "master golf professional" in payload["prompt_payload"]
+        assert "llm" not in payload
         assert payload["kinematics"]["events"] is None  # A still image is not a swing.
         assert response.headers["Cache-Control"] == "no-store"
         repeated = client.post(
@@ -50,7 +51,7 @@ def main():
         )
         assert repeated.status_code == 200 and repeated.json()["pose"] is None
     print(
-        "Phase 3 smoke passed: authenticated upload, real isolated YOLO, 24 pose/chart frames, rules, disabled LLM, saved-pose coaching."
+        "Phase 3 smoke passed: authenticated upload, real isolated YOLO, 24 pose/chart frames, rules, local coaching prompt, saved-pose coaching."
     )
 
 

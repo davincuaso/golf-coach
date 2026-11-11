@@ -1,4 +1,4 @@
-"""Typed contracts shared by offline coaching, the API and the future frontend."""
+"""Typed contracts shared by offline coaching, the API and the frontend."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class VideoMetadata(BaseModel):
 
 
 class VisionDocument(BaseModel):
-    """Accept Phase 2 JSON; discard unused metadata before any network synthesis."""
+    """Accept Phase 2 JSON and discard unused metadata before coaching."""
 
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
     schema_version: Literal["1.0.0"]
@@ -103,8 +103,6 @@ class AnalysisOptions(StrictModel):
     estimate_events: StrictBool = True
     confirm_constant_frame_rate: StrictBool = False
     subject_point: tuple[FiniteFloat, FiniteFloat] | None = None
-    # None: a supplied BYOK header opts in. False always disables synthesis.
-    llm_enabled: StrictBool | None = None
     include_pose: StrictBool = True
 
     @model_validator(mode="after")
@@ -163,28 +161,9 @@ class RuleReport(StrictModel):
     notices: list[str]
 
 
-class Priority(StrictModel):
-    fault_code: str = Field(max_length=80)
-    explanation: str = Field(max_length=800)
-
-
-class CoachingNarrative(StrictModel):
-    summary: str = Field(max_length=2400)
-    possible_root_cause: str | None = Field(max_length=1400)
-    priorities: list[Priority] = Field(max_length=3)
-    recommended_drill_ids: list[str] = Field(max_length=3)
-    practice_plan: str = Field(max_length=1600)
-
-
-class SynthesisResult(StrictModel):
-    status: Literal["disabled", "complete", "skipped", "unavailable"]
-    narrative: CoachingNarrative | None = None
-    reason: str | None = None
-
-
 class AnalysisResponse(StrictModel):
     analysis_id: str
     kinematics: KinematicsReport
     coaching: RuleReport
-    llm: SynthesisResult
+    prompt_payload: str = Field(min_length=1)
     pose: VisionDocument | None

@@ -1,4 +1,4 @@
-"""Temporary media lifecycle, worker cancellation and request-scoped synthesis."""
+"""Temporary media lifecycle, worker cancellation and local prompt generation."""
 
 from __future__ import annotations
 
@@ -12,11 +12,10 @@ import sys
 import tempfile
 from uuid import uuid4
 
-from pydantic import SecretStr
 from starlette.datastructures import UploadFile
 
 from app.coaching.kinematics import calculate_kinematics
-from app.coaching.llm_synthesizer import synthesize_coaching
+from app.coaching.llm_synthesizer import generate_coaching_prompt
 from app.coaching.rule_engine import evaluate_rules
 from app.coaching.schemas import AnalysisOptions, AnalysisResponse, VisionDocument
 from app.config import BACKEND_ROOT, Settings
@@ -148,7 +147,6 @@ class AnalysisService:
         self,
         payload: VisionDocument | dict,
         options: AnalysisOptions,
-        key: SecretStr | None,
     ) -> AnalysisResponse:
         def compute():
             document = VisionDocument.model_validate(payload)
@@ -161,20 +159,11 @@ class AnalysisService:
             raise ServiceError(
                 422, "invalid_analysis", "Pose data or swing markers are invalid for this clip."
             ) from None
-        enabled = options.llm_enabled if options.llm_enabled is not None else key is not None
-        llm = await synthesize_coaching(
-            metrics,
-            rules,
-            api_key=key,
-            enabled=enabled,
-            model=self.settings.openai_model,
-            timeout_seconds=self.settings.openai_timeout_seconds,
-        )
         return AnalysisResponse(
             analysis_id=str(uuid4()),
             kinematics=metrics,
             coaching=rules,
-            llm=llm,
+            prompt_payload=generate_coaching_prompt(metrics, rules),
             pose=document if options.include_pose else None,
         )
 
@@ -182,16 +171,14 @@ class AnalysisService:
         self,
         document: VisionDocument,
         options: AnalysisOptions,
-        key: SecretStr | None,
     ) -> AnalysisResponse:
         async with self._slot():
-            return await self._finish(document, options, key)
+            return await self._finish(document, options)
 
     async def analyze_upload(
         self,
         video: UploadFile,
         options: AnalysisOptions,
-        key: SecretStr | None,
     ) -> AnalysisResponse:
         suffix = Path(video.filename or "").suffix.lower()
         if suffix not in VIDEO_SUFFIXES:
@@ -213,13 +200,12 @@ class AnalysisService:
                 if size == 0:
                     raise ServiceError(422, "empty_video", "The uploaded video is empty.")
                 payload = await self._run_worker(source, folder, options)
-                return await self._finish(payload, options, key)
+                return await self._finish(payload, options)
 
     async def analyze_storage(
         self,
         object_path: str,
         options: AnalysisOptions,
-        key: SecretStr | None,
     ) -> AnalysisResponse:
         validate_object_path(object_path, self.settings.storage_prefix)
         async with self._slot():
@@ -228,4 +214,4 @@ class AnalysisService:
                 source = folder / ("input" + Path(object_path).suffix.lower())
                 await download_private_video(object_path, source, self.settings)
                 payload = await self._run_worker(source, folder, options)
-                return await self._finish(payload, options, key)
+                return await self._finish(payload, options)
