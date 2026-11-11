@@ -1,0 +1,47 @@
+# Secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+htmlcov/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+
+# Private media, model weights, and generated analyses
+data/*
+!data/.gitkeep
+backend/models/*
+!backend/models/README.md
+*.pt
+*.onnx
+*.task
+*.mp4
+*.mov
+*.webm
+*.avi
+
+# Local tools
+.DS_Store
+.idea/
+.vscode/
+.cache/

@@ -1,0 +1,14 @@
+# Python 3.12. Exact direct dependencies; generate a deployment lock for your OS/GPU.
+fastapi==0.162.4
+uvicorn[standard]==0.54.0
+ultralytics==8.4.210
+# 0.10.31 avoids the additional cv2 distribution required by newer MediaPipe.
+# Installed for a future alternative adapter; Phase 2 uses YOLO's COCO-17 skeleton.
+mediapipe==0.10.31
+opencv-python==5.0.0.93
+numpy==2.5.4
+scipy==1.18.1
+openai==3.49.0
+pydantic-settings==2.16.2
+python-multipart==0.0.33
+httpx==0.28.1

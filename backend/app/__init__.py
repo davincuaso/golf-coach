@@ -1,0 +1,1 @@
+"""Golf Coach backend package."""
