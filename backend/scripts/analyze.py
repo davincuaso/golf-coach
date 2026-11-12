@@ -18,10 +18,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("video", type=Path)
     parser.add_argument(
-        "--view", choices=["down_the_line", "face_on", "unknown"], default="unknown"
+        "--view",
+        choices=["down_the_line", "face_on", "oblique", "rear", "overhead", "unknown"],
+        default="unknown",
     )
     parser.add_argument("--events", type=float, nargs=3, metavar=("START", "TOP", "IMPACT"))
     parser.add_argument("--subject-point", type=float, nargs=2)
+    parser.add_argument("--confirm-camera-alignment", action="store_true")
     parser.add_argument("--output", type=Path, default=BACKEND.parent / "data/api.analysis.json")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
@@ -41,6 +44,7 @@ def main():
     )
     options = AnalysisOptions(
         camera_view=args.view,
+        camera_alignment_confirmed=args.confirm_camera_alignment,
         events=events,
         subject_point=tuple(args.subject_point) if args.subject_point else None,
     )

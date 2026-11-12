@@ -12,6 +12,8 @@ import {
   validateVideo,
 } from "../src/lib/capture.ts";
 import type { PoseFrame } from "../src/lib/api-types.ts";
+import { videoPointFromClick } from "../src/lib/visualization.ts";
+import { validateVideoDuration } from "../src/lib/capture.ts";
 const frames: PoseFrame[] = [0, 0.04, 0.19, 0.23].map(
   (timestamp_seconds, frame_index) => ({
     timestamp_seconds,
@@ -20,6 +22,28 @@ const frames: PoseFrame[] = [0, 0.04, 0.19, 0.23].map(
     angles_deg: {},
   }),
 );
+
+test("subject selection accounts for portrait/landscape letterboxing and rejects bars", () => {
+  assert.deepEqual(
+    videoPointFromClick(200, 150, 400, 300, 1920, 1080),
+    [0.5, 0.5],
+  );
+  assert.equal(videoPointFromClick(200, 10, 400, 300, 1920, 1080), null);
+  assert.equal(videoPointFromClick(10, 150, 400, 300, 1080, 1920), null);
+  assert.deepEqual(
+    videoPointFromClick(200, 150, 400, 300, 1080, 1920),
+    [0.5, 0.5],
+  );
+  assert.equal(videoPointFromClick(0, 0, 0, 0, 0, 0), null);
+});
+
+test("long supplied recordings are flagged before upload, while unknown duration stays server-validated", () => {
+  assert.match(validateVideoDuration(91.76) || "", /Open Sessions to choose a swing window/);
+  assert.match(validateVideoDuration(47.03) || "", /30 seconds/);
+  assert.equal(validateVideoDuration(6.37), null);
+  assert.equal(validateVideoDuration(undefined), null);
+  assert.equal(validateVideoDuration(Infinity), null);
+});
 test("overlay uses nearest decoded timestamp, handles VFR, seeks and gaps", () => {
   assert.equal(nearestPoseFrame(frames, 0.18), 2);
   assert.equal(nearestPoseFrame(frames, 0.045), 1);

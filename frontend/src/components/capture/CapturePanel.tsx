@@ -9,7 +9,11 @@ import {
 import { VideoUpload } from "./VideoUpload";
 import { VideoRecorder } from "./VideoRecorder";
 import { Icon } from "@/components/ui/Icon";
-import { parseSwingMarkers, validateVideo } from "@/lib/capture";
+import {
+  parseSwingMarkers,
+  validateVideo,
+  validateVideoDuration,
+} from "@/lib/capture";
 import { uploadAnalysis, type UploadProgress } from "@/lib/analysis-client";
 import type {
   AnalysisOptions,
@@ -24,6 +28,9 @@ interface Props {
   onSelect: (file: File) => void;
   onResult: (result: AnalysisResponse) => void;
   onBusyChange: (busy: boolean) => void;
+  onOptionsChange: () => void;
+  subject: [string, string];
+  onSubjectChange: (point: [string, string]) => void;
 }
 export function CapturePanel({
   file,
@@ -32,15 +39,18 @@ export function CapturePanel({
   onSelect,
   onResult,
   onBusyChange,
+  onOptionsChange,
+  subject,
+  onSubjectChange,
 }: Props) {
   const [mode, setMode] = useState<"upload" | "record">("upload");
+  const [alignmentConfirmed, setAlignmentConfirmed] = useState(false);
   const [cameraView, setCameraView] = useState<CameraView>("unknown");
   const [markers, setMarkers] = useState<[string, string, string]>([
     "",
     "",
     "",
   ]);
-  const [subject, setSubject] = useState<[string, string]>(["", ""]);
   const [constantRate, setConstantRate] = useState(false);
   const [recording, setRecording] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -69,10 +79,22 @@ export function CapturePanel({
     (next: File) => {
       setError(null);
       setMarkers(["", "", ""]);
+      setAlignmentConfirmed(false);
+      setCameraView("unknown");
       onSelect(next);
     },
     [onSelect],
   );
+  useEffect(() => {
+    onOptionsChange();
+  }, [
+    cameraView,
+    alignmentConfirmed,
+    markers,
+    subject,
+    constantRate,
+    onOptionsChange,
+  ]);
   const analyze = async (event: FormEvent) => {
     event.preventDefault();
     if (!file || busy || recording) return;
@@ -81,6 +103,8 @@ export function CapturePanel({
     try {
       const fileError = validateVideo(file);
       if (fileError) throw new Error(fileError);
+      const durationError = validateVideoDuration(duration);
+      if (durationError) throw new Error(durationError);
       const events = parseSwingMarkers(markers, duration);
       let point: [number, number] | undefined;
       if (subject.some((value) => value.trim() !== "")) {
@@ -98,6 +122,8 @@ export function CapturePanel({
       }
       options = {
         camera_view: cameraView,
+        camera_alignment_confirmed:
+          cameraView === "down_the_line" && alignmentConfirmed,
         events,
         estimate_events: !events,
         confirm_constant_frame_rate: constantRate,
@@ -206,17 +232,40 @@ export function CapturePanel({
           className="field"
           value={cameraView}
           disabled={busy || recording}
-          onChange={(event) => setCameraView(event.target.value as CameraView)}
+          onChange={(event) => {
+            setCameraView(event.target.value as CameraView);
+            setAlignmentConfirmed(false);
+          }}
         >
           <option value="unknown">Not sure yet</option>
           <option value="down_the_line">
             Down the line (behind the golfer)
           </option>
           <option value="face_on">Face on (facing the golfer)</option>
+          <option value="oblique">Oblique / diagonal view</option>
+          <option value="rear">Rear body view, off the target line</option>
+          <option value="overhead">Overhead / elevated view</option>
         </select>
         <p className="help-text mt-2">
-          Posture comparisons need a fixed, down-the-line view.
+          Every view can be reviewed. Posture-change screening requires a
+          confirmed down-the-line setup; timing has its own tracking checks.
         </p>
+        {cameraView === "down_the_line" && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={alignmentConfirmed}
+              disabled={busy || recording}
+              onChange={(event) => setAlignmentConfirmed(event.target.checked)}
+            />
+            The camera is level, stationary, and aligned down my target line.
+          </label>
+        )}
+        {validateVideoDuration(duration) && (
+          <p className="message message-warning" role="status">
+            {validateVideoDuration(duration)}
+          </p>
+        )}
         <details className="advanced-options">
           <summary>
             Fine-tune this analysis<span aria-hidden="true">+</span>
@@ -284,8 +333,8 @@ export function CapturePanel({
               Multiple golfers? <span className="font-normal">(optional)</span>
             </p>
             <p className="help-text mb-3">
-              Choose a point inside your body in the first frame: x from left, y
-              from top, each 0–1.
+              Use Select golfer on the video, or enter a point inside your body
+              in the first frame: x from left, y from top, each 0–1.
             </p>
             <div className="subject-inputs">
               {["x", "y"].map((axis, index) => (
@@ -300,13 +349,11 @@ export function CapturePanel({
                     step="any"
                     placeholder="0.50"
                     value={subject[index]}
-                    onChange={(event) =>
-                      setSubject((previous) => {
-                        const next = [...previous] as [string, string];
-                        next[index] = event.target.value;
-                        return next;
-                      })
-                    }
+                    onChange={(event) => {
+                      const next = [...subject] as [string, string];
+                      next[index] = event.target.value;
+                      onSubjectChange(next);
+                    }}
                   />
                 </label>
               ))}

@@ -32,14 +32,17 @@ you rotate the backend token, update the frontend server token as well.
 ## Capture and review
 
 Upload an MP4, MOV, WebM, AVI, or M4V, or open the camera and record video without
-audio. Recordings stop at 30 seconds; the browser limit is 100 MiB. The backend
+audio. Recordings stop at 30 seconds; the default upload limit is 250 MiB. The backend
 independently checks duration, decoded content, and resource limits. Camera access
 requires HTTPS or localhost and browser permission. Tracks stop on completion,
 close, source change, or unmount. Browser/OpenCV codec support varies; MP4/H.264 or
 WebM is generally suitable for playback. A browser playback warning does not
 prevent backend analysis.
 
-Choose the perspective; posture screening needs a fixed down-the-line view.
+Choose the perspective. Posture screening needs a confirmed, level, stationary
+down-the-line setup. Oblique, rear-body, elevated, face-on, and unknown views are
+accepted; each measurement has its own eligibility check. Select golfer in the
+video to choose a torso point in frame one when other people are visible.
 Optional start/top/impact markers must all be supplied and ordered inside the
 clip. Scrub the player and use its time buttons. Leave all blank for estimation.
 For multiple people, enter a normalized point inside your body in frame one.
@@ -54,6 +57,25 @@ the player, including letterboxing. Interpolated points are amber; missing point
 are omitted. An orientation/aspect mismatch hides the overlay with an explanation.
 Missing chart samples break the line; unknown metrics show a dash. Wrist speed is
 torso lengths per second, not measured clubhead speed.
+
+The View & tracking quality panel shows evaluated time range, per-group coverage,
+gaps, camera hints, and measurement-specific reasons for withholding a result.
+Coverage is not accuracy probability. See [the accuracy roadmap](accuracy-and-ball-flight.md).
+
+## Sessions
+
+Open `/sessions` for up to eight windows from multiple source recordings. Sources
+may exceed 30 seconds; each selected window must fit within 30 seconds. Give
+separate swings different IDs and views of the same physical swing the same ID.
+Each window has its own camera, subject selection, and relative phase markers.
+The page processes sequentially, retains completed results for retry/partial
+reports, supports independent side-by-side playback of linked views, and exports
+a complete session JSON. The session lives in memory until exported.
+
+Reviewed summaries count each swing once per metric, retain selected source IDs,
+and withhold conflicting supported views. Automatic markers stay provisional.
+One combined ChatGPT prompt preserves every report’s scalar/quality/rule evidence.
+See [the session guide](multi-video-sessions.md) for limits, provenance, and API details.
 
 ## Manual coaching
 
@@ -80,13 +102,17 @@ See [the prompt workflow](prompt-workflow.md) for content and migration details.
 endpoint with server-side bearer auth. It enforces origins, actual streamed bytes,
 timeouts and sanitized errors. It forwards only content type and backend auth;
 browser cookies, credentials, and retired provider headers are not forwarded.
-The route independently rechecks workspace authentication, beyond middleware.
+Both API routes independently enforce workspace authentication. API paths bypass
+page middleware to avoid Next.js 15’s default 10 MiB body-clone truncation; the
+route streams remain byte-bounded. Page authentication/CSP still use middleware.
+The same-origin `/api/v1/sessions` JSON proxy uses the same auth/origin checks and
+an independent 1 MiB body cap.
 
 Server-only environment settings (never use `NEXT_PUBLIC_` for credentials):
 
 - `GOLF_BACKEND_URL`: defaults to loopback port 8000. Remote backends require HTTPS.
 - `GOLF_API_TOKEN`: matches the backend token; protects analysis access.
-- `GOLF_MAX_VIDEO_BYTES`: defaults to 104857600 plus 1 MiB multipart allowance.
+- `GOLF_MAX_VIDEO_BYTES`: defaults to 262144000 plus 1 MiB multipart allowance.
 - `GOLF_REQUEST_TIMEOUT_MS`: defaults to 300000; the browser timeout is 310 seconds.
 - `GOLF_WEB_USERNAME`: Basic auth username; default `coach`.
 - `GOLF_WEB_PASSWORD`: at least 16 characters; required for production/non-loopback.
@@ -123,6 +149,7 @@ origins, byte limits, error redaction, markers, pose lookup, and chart gaps.
 
 For a real Next.js → FastAPI → YOLO smoke test, prepare the backend's ignored
 sample/model with `scripts/smoke_pose.py`, start both development servers, and run
-`npm run smoke:web`. It validates 24 pose/chart frames and a coaching prompt.
+`npm run smoke:web`. It uploads a padded file larger than 10 MiB, validates 24 pose/chart frames and a
+coaching prompt, then combines the signed report through the session endpoint.
 The still sample tests wiring, not golf accuracy. Physical camera/browser codecs
 require device-specific testing. Manual ChatGPT submission is left to the user.

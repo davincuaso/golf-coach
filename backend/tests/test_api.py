@@ -28,7 +28,12 @@ def client(application):
 def coaching_body(**options):
     return {
         "vision": pose_document(spine_at=lambda t: 20 if t > 1.25 else 45),
-        "options": {"camera_view": "down_the_line", "events": MARKERS, **options},
+        "options": {
+            "camera_view": "down_the_line",
+            "camera_alignment_confirmed": True,
+            "events": MARKERS,
+            **options,
+        },
     }
 
 

@@ -14,7 +14,11 @@ const video = await readFile(new URL("../../data/smoke.avi", import.meta.url));
 const form = new FormData();
 form.append(
   "video",
-  new File([video], "smoke.avi", { type: "video/x-msvideo" }),
+  // AVI readers ignore trailing padding. Exceed Next middleware's 10 MiB clone
+  // limit so this smoke also catches accidental truncation of large uploads.
+  new File([video, new Uint8Array(11 * 1024 * 1024)], "smoke.avi", {
+    type: "video/x-msvideo",
+  }),
 );
 form.append(
   "options",
@@ -38,6 +42,26 @@ assert.equal(result.kinematics.series.length, 24);
 assert.ok(result.prompt_payload.includes("master golf professional"));
 assert.ok(!("llm" in result));
 assert.equal(result.kinematics.events, null); // A still sample is not a golf swing.
+const sessionResponse = await fetch(`${origin}/api/v1/sessions`, {
+  method: "POST",
+  headers: { Origin: origin, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    attempted_clips: 1,
+    clips: [
+      {
+        clip_id: "smoke",
+        swing_id: "Swing 1",
+        summary_token: result.summary_token,
+      },
+    ],
+  }),
+});
+assert.equal(sessionResponse.status, 200);
+const session = await sessionResponse.json();
+assert.equal(session.analyzed_clips, 1);
+assert.equal(session.unique_swings, 1);
+assert.equal(session.tempo.median, null);
+assert.ok(session.prompt_payload.includes("SESSION_JSON"));
 console.log(
-  "Web smoke passed: Next.js proxy → FastAPI → isolated YOLO → 24 validated pose/chart frames; local ChatGPT prompt generated.",
+  "Web smoke passed: >10 MiB streaming upload → FastAPI → isolated YOLO → 24 validated pose/chart frames → signed session summary; local ChatGPT prompts generated.",
 );

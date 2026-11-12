@@ -67,6 +67,8 @@ class AnalysisService:
             cutoff_hz=self.settings.filter_cutoff_hz,
             max_input_bytes=self.settings.max_video_bytes,
             subject_point=options.subject_point,
+            source_start_seconds=options.source_start_seconds,
+            source_end_seconds=options.source_end_seconds,
         )
         from dataclasses import asdict
 
@@ -159,8 +161,14 @@ class AnalysisService:
             raise ServiceError(
                 422, "invalid_analysis", "Pose data or swing markers are invalid for this clip."
             ) from None
+        from app.services.sessions import sign_analysis
+
+        identifier = str(uuid4())
         return AnalysisResponse(
-            analysis_id=str(uuid4()),
+            analysis_id=identifier,
+            summary_token=sign_analysis(
+                identifier, metrics, rules, self.settings.api_token.get_secret_value()
+            ),
             kinematics=metrics,
             coaching=rules,
             prompt_payload=generate_coaching_prompt(metrics, rules),

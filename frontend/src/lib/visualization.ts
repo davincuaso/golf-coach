@@ -62,3 +62,27 @@ export function formatMetric(
     ? "—"
     : `${value.toFixed(decimals)}${suffix}`;
 }
+
+/** Map an object-fit:contain click into decoded video coordinates, excluding bars. */
+export function videoPointFromClick(
+  x: number,
+  y: number,
+  boxWidth: number,
+  boxHeight: number,
+  videoWidth: number,
+  videoHeight: number,
+): [number, number] | null {
+  if (
+    ![x, y, boxWidth, boxHeight, videoWidth, videoHeight].every(
+      Number.isFinite,
+    ) ||
+    Math.min(boxWidth, boxHeight, videoWidth, videoHeight) <= 0
+  )
+    return null;
+  const scale = Math.min(boxWidth / videoWidth, boxHeight / videoHeight);
+  const width = videoWidth * scale,
+    height = videoHeight * scale;
+  const px = (x - (boxWidth - width) / 2) / width;
+  const py = (y - (boxHeight - height) / 2) / height;
+  return px < 0 || px > 1 || py < 0 || py > 1 ? null : [px, py];
+}

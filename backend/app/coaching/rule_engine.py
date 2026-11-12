@@ -51,8 +51,15 @@ def evaluate_rules(metrics: KinematicsReport, config: RuleConfig | None = None) 
     notices = [
         "These are configurable coaching observations, not diagnoses or universal swing targets."
     ]
-    if metrics.posture_eligible and metrics.max_posture_loss_deg is not None:
-        if metrics.max_posture_loss_deg > config.posture_loss_threshold_deg:
+    if (
+        metrics.posture_eligible
+        and metrics.quality.posture.eligible
+        and metrics.max_posture_loss_deg is not None
+    ):
+        if (
+            metrics.event_source == "manual"
+            and metrics.max_posture_loss_deg > config.posture_loss_threshold_deg
+        ):
             faults.append(
                 Fault(
                     code="LOSS_OF_POSTURE",
@@ -71,8 +78,15 @@ def evaluate_rules(metrics: KinematicsReport, config: RuleConfig | None = None) 
         notices.append(
             "Posture screening was skipped because camera view or landmark evidence was insufficient."
         )
-    if metrics.tempo_ratio is not None and metrics.timing_reliable:
-        if not config.tempo_min <= metrics.tempo_ratio <= config.tempo_max:
+    if (
+        metrics.tempo_ratio is not None
+        and metrics.timing_reliable
+        and metrics.quality.tempo.eligible
+    ):
+        if (
+            metrics.event_source == "manual"
+            and not config.tempo_min <= metrics.tempo_ratio <= config.tempo_max
+        ):
             faults.append(
                 Fault(
                     code="TEMPO_OUTSIDE_REFERENCE",
@@ -91,10 +105,12 @@ def evaluate_rules(metrics: KinematicsReport, config: RuleConfig | None = None) 
     else:
         notices.append("Tempo screening needs usable swing markers and reliable timing.")
     if metrics.event_source == "estimated":
-        notices.append("Confirm the estimated swing markers before acting on these observations.")
+        notices.append(
+            "Swing markers are estimated. Review start/top/impact and reanalyze with manual markers before technique or tempo faults are screened."
+        )
     if not faults:
         notices.append(
-            "No configured threshold was crossed in the available evidence; this is not a complete swing assessment."
+            "No actionable fault was established from eligible measurements and reviewed markers; this is not a complete swing assessment."
         )
     drill_ids = list(dict.fromkeys(drill for fault in faults for drill in fault.drill_ids))
     return RuleReport(

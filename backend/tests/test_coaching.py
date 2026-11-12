@@ -10,7 +10,13 @@ from coaching_fixtures import MARKERS, pose_document, swing_distance
 
 
 def options(**changes):
-    return AnalysisOptions(events=SwingEvents(**MARKERS), camera_view="down_the_line", **changes)
+    defaults = {
+        "events": SwingEvents(**MARKERS),
+        "camera_view": "down_the_line",
+        "camera_alignment_confirmed": True,
+    }
+    defaults.update(changes)
+    return AnalysisOptions(**defaults)
 
 
 def test_known_geometry_and_tempo_are_calculated_from_pixels_and_seconds():
@@ -105,7 +111,7 @@ def test_disabling_estimation_requires_manual_markers():
 def test_tempo_reference_is_configurable_and_assumed_timing_requires_confirmation():
     document = pose_document(timestamp_source="nominal_fps_fallback")
     report = calculate_kinematics(document, options())
-    assert report.tempo_ratio == 3 and not report.timing_reliable
+    assert report.tempo_ratio is None and not report.timing_reliable
     assert not evaluate_rules(report, RuleConfig(tempo_min=4, tempo_max=5)).faults
     report = calculate_kinematics(document, options(confirm_constant_frame_rate=True))
     assert (

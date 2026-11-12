@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import type { AnalysisResponse } from "@/lib/api-types";
 import { CapturePanel } from "./capture/CapturePanel";
 import { SwingVideoPlayer } from "./analysis/SwingVideoPlayer";
@@ -7,8 +8,10 @@ import { MetricCards, KinematicsPanel } from "./analysis/KinematicsPanel";
 import { CoachingFeedback } from "./analysis/CoachingFeedback";
 import { AiCoachingPrompt } from "./analysis/AiCoachingPrompt";
 import { Icon } from "./ui/Icon";
+import { CaptureQualityPanel } from "./analysis/CaptureQualityPanel";
 
 export function SwingWorkspace() {
+  const [subject, setSubject] = useState<[string, string]>(["", ""]);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -17,10 +20,12 @@ export function SwingWorkspace() {
   const [session, setSession] = useState(0);
   const select = useCallback((next: File) => {
     setFile(next);
+    setSubject(["", ""]);
     setResult(null);
     setPlayhead(0);
     setDuration(undefined);
   }, []);
+  const optionsChanged = useCallback(() => setResult(null), []);
   const activity = useCallback((value: boolean) => {
     setBusy(value);
     if (value) setResult(null);
@@ -28,6 +33,7 @@ export function SwingWorkspace() {
   const reset = () => {
     setSession((value) => value + 1);
     setFile(null);
+    setSubject(["", ""]);
     setResult(null);
     setBusy(false);
     setPlayhead(0);
@@ -53,6 +59,9 @@ export function SwingWorkspace() {
           <p className="page-description">
             See the movement. Understand the pattern. Make your next rep count.
           </p>
+          <Link href="/sessions" className="text-button">
+            Multiple views or a longer recording? Analyze a session →
+          </Link>
         </div>
         <div className="heading-actions">
           {result && (
@@ -84,14 +93,35 @@ export function SwingWorkspace() {
           onSelect={select}
           onResult={setResult}
           onBusyChange={activity}
+          onOptionsChange={optionsChanged}
+          subject={subject}
+          onSubjectChange={setSubject}
         />
         <SwingVideoPlayer
           file={file}
           pose={result?.pose ?? null}
           onTime={setPlayhead}
           onDuration={setDuration}
+          subjectPoint={
+            subject.every(
+              (value) => value.trim() !== "" && Number.isFinite(Number(value)),
+            )
+              ? [Number(subject[0]), Number(subject[1])]
+              : undefined
+          }
+          onSubjectPoint={(point) => {
+            setSubject([point[0].toFixed(5), point[1].toFixed(5)]);
+            setResult(null);
+          }}
+          disabled={busy}
         />
       </div>
+      {result && (
+        <CaptureQualityPanel
+          quality={result.kinematics.quality}
+          eventSource={result.kinematics.event_source}
+        />
+      )}
       <MetricCards data={result?.kinematics ?? null} />
       {result ? (
         <>

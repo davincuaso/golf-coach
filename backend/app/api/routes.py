@@ -10,6 +10,7 @@ from starlette.datastructures import UploadFile
 from app.coaching.schemas import AnalysisOptions, AnalysisResponse, StrictModel, VisionDocument
 from app.errors import ServiceError
 from app.services.analysis import AnalysisService
+from app.services.sessions import SessionRequest, SessionResponse, summarize_session
 
 router = APIRouter(
     prefix="/api/v1", dependencies=[Depends(HTTPBearer(scheme_name="BackendBearer"))]
@@ -90,3 +91,8 @@ async def coach_existing_pose(
     analysis: Annotated[AnalysisService, Depends(service)],
 ) -> AnalysisResponse:
     return await analysis.analyze_document(body.vision, body.options)
+
+
+@router.post("/sessions", response_model=SessionResponse)
+async def combine_session(body: SessionRequest, request: Request) -> SessionResponse:
+    return summarize_session(body, request.app.state.settings.api_token.get_secret_value())

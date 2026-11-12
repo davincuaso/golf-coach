@@ -164,3 +164,31 @@ test("provider errors and private configuration never appear in client error tex
   });
   assert.equal(c.status, 503);
 });
+test("session proxy uses its authenticated JSON endpoint and independent body limit", async () => {
+  const fetcher: typeof fetch = async (url, init) => {
+    assert.equal(String(url), "http://127.0.0.1:8000/api/v1/sessions");
+    assert.equal(
+      new Headers(init?.headers).get("authorization"),
+      "Bearer server-token-test-only",
+    );
+    await new Response(init?.body).arrayBuffer();
+    return Response.json({ status: "complete" });
+  };
+  const valid = await proxyAnalysis(
+    request(
+      { "content-type": "application/json" },
+      JSON.stringify({ clips: [] }),
+    ),
+    { ...env, GOLF_MAX_VIDEO_BYTES: "1024" },
+    fetcher,
+    "session",
+  );
+  assert.equal(valid.status, 200);
+  const oversized = await proxyAnalysis(
+    request({ "content-type": "application/json" }, new Uint8Array(1048577)),
+    env,
+    fetcher,
+    "session",
+  );
+  assert.equal(oversized.status, 413);
+});

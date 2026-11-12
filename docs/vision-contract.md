@@ -12,6 +12,14 @@ are `null`; JSON never contains NaN or Infinity. Frames appear in decode order.
 - `warnings`: limitations and data quality findings.
 - `frames[]`: frame index, timestamp, person box, named landmarks, angles and club.
 
+When a source window is selected, `video.source_start_seconds` is the actual
+first decoded source timestamp and `video.source_duration_seconds` is the
+source's nominal duration when available. Frame indices/timestamps restart at
+zero for that window. Overlays seek the original video by adding the source
+offset; phase markers use window-relative time. Inference limits apply to the
+selected window, while upload limits apply to the entire source file. See
+[multi-video sessions](multi-video-sessions.md).
+
 Each landmark includes raw pixels, stabilized pixels, normalized coordinates,
 the original frame's detector confidence, and `observed`, `interpolated`,
 `filtered` flags. Confidence is never copied into an occluded frame. A low

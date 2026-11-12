@@ -9,6 +9,7 @@ import {
 
 const result: AnalysisResponse = {
   analysis_id: "test-analysis",
+  summary_token: "test-only-summary-token",
   pose: null,
   kinematics: {
     version: "1.0.0",
@@ -26,6 +27,37 @@ const result: AnalysisResponse = {
     max_posture_loss_deg: null,
     posture_valid_fraction: 0,
     posture_eligible: false,
+    quality: {
+      version: "1.0.0",
+      status: "insufficient",
+      window_start_seconds: 0,
+      window_end_seconds: 0,
+      window_source: "whole_clip",
+      camera: {
+        declared_view: "unknown",
+        alignment_confirmed: false,
+        assessment: "needs_confirmation",
+        projection_hint: "unknown",
+        projected_width_torso_ratio: null,
+        note: "Not calibrated",
+      },
+      tracking: {
+        evaluated_frames: 0,
+        detected_fraction: 0,
+        torso_valid_fraction: 0,
+        wrist_pair_valid_fraction: 0,
+        full_body_valid_fraction: 0,
+        border_contact_fraction: 0,
+        interpolated_fraction: 0,
+        largest_torso_gap_seconds: 0,
+        largest_wrist_gap_seconds: 0,
+        torso_jump_count: 0,
+        keypoint_coverage: {},
+      },
+      tempo: { eligible: false, reasons: ["Need markers"] },
+      posture: { eligible: false, reasons: ["Need view"] },
+      issues: [],
+    },
     warnings: ["No usable movement"],
     series: [],
   },
@@ -34,6 +66,7 @@ const result: AnalysisResponse = {
 };
 const options: AnalysisOptions = {
   camera_view: "unknown",
+  camera_alignment_confirmed: false,
   estimate_events: true,
   confirm_constant_frame_rate: false,
   include_pose: true,

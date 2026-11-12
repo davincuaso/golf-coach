@@ -15,7 +15,11 @@ from coaching_fixtures import MARKERS, pose_document
 def evidence():
     metrics = calculate_kinematics(
         pose_document(spine_at=lambda t: 20 if t >= 1.25 else 45),
-        AnalysisOptions(events=SwingEvents(**MARKERS), camera_view="down_the_line"),
+        AnalysisOptions(
+            events=SwingEvents(**MARKERS),
+            camera_view="down_the_line",
+            camera_alignment_confirmed=True,
+        ),
     )
     return metrics, evaluate_rules(metrics)
 

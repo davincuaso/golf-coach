@@ -230,3 +230,41 @@ def test_resource_limit_is_enforced(video):
         process_video(video, FixtureDetector(), VisionConfig(max_input_bytes=1))
     with pytest.raises(VisionError, match="existing local"):
         process_video(Path("missing-video.mp4"), FixtureDetector(), VisionConfig())
+
+
+def test_selected_source_window_resets_pose_clock_and_preserves_source_offset(video):
+    payload = process_video(
+        video, FixtureDetector(), VisionConfig(source_start_seconds=0.2, source_end_seconds=0.6)
+    )
+    assert 23 <= len(payload["frames"]) <= 25
+    assert abs(payload["video"]["source_start_seconds"] - 0.2) < 1 / 60
+    assert payload["frames"][0]["timestamp_seconds"] == 0
+    assert payload["frames"][-1]["timestamp_seconds"] <= 0.4 + 1 / 60
+    assert payload["video"]["source_duration_seconds"] > 0.8
+
+
+def test_source_window_validation_and_selected_limits(video):
+    with pytest.raises(ValueError):
+        VisionConfig(source_start_seconds=2)
+    with pytest.raises(ValueError):
+        VisionConfig(source_start_seconds=0, source_end_seconds=31)
+    with pytest.raises(VisionError, match="beyond"):
+        process_video(
+            video, FixtureDetector(), VisionConfig(source_start_seconds=2, source_end_seconds=3)
+        )
+
+
+def test_long_source_is_decoded_only_in_the_selected_short_window(tmp_path):
+    import cv2
+
+    path = tmp_path / "long.avi"
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), 30, (160, 120))
+    assert writer.isOpened()
+    for _ in range(1000):
+        writer.write(np.zeros((120, 160, 3), dtype=np.uint8))
+    writer.release()
+    payload = process_video(
+        path, FixtureDetector(), VisionConfig(source_start_seconds=31, source_end_seconds=31.5)
+    )
+    assert 14 <= len(payload["frames"]) <= 16
+    assert payload["video"]["source_start_seconds"] >= 31

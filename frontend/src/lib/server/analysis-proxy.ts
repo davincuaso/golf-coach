@@ -20,6 +20,7 @@ export async function proxyAnalysis(
   request: Request,
   env: ProxyEnvironment,
   fetcher: typeof fetch = fetch,
+  mode: "analysis" | "session" = "analysis",
 ): Promise<Response> {
   const access = await workspaceAccess(request, env);
   if (access !== "allowed")
@@ -71,19 +72,21 @@ export async function proxyAnalysis(
     );
   const contentType = request.headers.get("content-type") || "";
   if (
-    !/^multipart\/form-data;\s*boundary=/i.test(contentType) ||
+    !(mode === "session"
+      ? /^application\/json(?:;|$)/i.test(contentType)
+      : /^multipart\/form-data;\s*boundary=/i.test(contentType)) ||
     contentType.length > 300 ||
     !request.body
   )
     return jsonError(415, "Choose a video file to analyze.");
-  const configuredMax = Number(env.GOLF_MAX_VIDEO_BYTES || 104857600);
+  const configuredMax = Number(env.GOLF_MAX_VIDEO_BYTES || 262144000);
   if (
     !Number.isSafeInteger(configuredMax) ||
     configuredMax < 1024 ||
     configuredMax > 524288000
   )
     return jsonError(503, "The upload limit is not configured correctly.");
-  const maxBytes = configuredMax + 1048576;
+  const maxBytes = mode === "session" ? 1048576 : configuredMax + 1048576;
   const length = request.headers.get("content-length");
   if (
     length !== null &&
@@ -93,7 +96,7 @@ export async function proxyAnalysis(
   let upstream: URL;
   try {
     upstream = new URL(
-      "/api/v1/analyses",
+      mode === "session" ? "/api/v1/sessions" : "/api/v1/analyses",
       env.GOLF_BACKEND_URL || "http://127.0.0.1:8000",
     );
     if (

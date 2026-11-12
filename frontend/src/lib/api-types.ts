@@ -20,7 +20,15 @@ export const landmarkNames = [
   "right_ankle",
 ] as const;
 export type LandmarkName = (typeof landmarkNames)[number];
-export type CameraView = "down_the_line" | "face_on" | "unknown";
+export const cameraViews = [
+  "down_the_line",
+  "face_on",
+  "oblique",
+  "rear",
+  "overhead",
+  "unknown",
+] as const;
+export type CameraView = (typeof cameraViews)[number];
 export interface SwingEvents {
   start_seconds: number;
   top_seconds: number;
@@ -28,11 +36,14 @@ export interface SwingEvents {
 }
 export interface AnalysisOptions {
   camera_view: CameraView;
+  camera_alignment_confirmed: boolean;
   events?: SwingEvents;
   estimate_events: boolean;
   confirm_constant_frame_rate: boolean;
   subject_point?: [number, number];
   include_pose: boolean;
+  source_start_seconds?: number;
+  source_end_seconds?: number;
 }
 export interface Landmark {
   xy_px: [number, number] | null;
@@ -57,6 +68,8 @@ export interface VisionDocument {
     height: number;
     nominal_fps: number;
     frame_count: number;
+    source_start_seconds?: number;
+    source_duration_seconds?: number | null;
     timestamp_source: "decoder_pts" | "nominal_fps_fallback";
   };
   frames: PoseFrame[];
@@ -83,6 +96,7 @@ export interface Kinematics {
   max_posture_loss_deg: number | null;
   posture_valid_fraction: number;
   posture_eligible: boolean;
+  quality: AnalysisQuality;
   warnings: string[];
   series: SeriesPoint[];
 }
@@ -107,6 +121,7 @@ export interface RuleReport {
 }
 export interface AnalysisResponse {
   analysis_id: string;
+  summary_token: string;
   kinematics: Kinematics;
   coaching: RuleReport;
   prompt_payload: string;
@@ -130,12 +145,58 @@ const landmark = z.object({
   interpolated: z.boolean(),
   filtered: z.boolean(),
 });
+const gate = z.object({ eligible: z.boolean(), reasons: z.array(z.string()) });
+export const analysisQualitySchema = z.object({
+  version: z.string(),
+  status: z.enum(["usable", "limited", "insufficient"]),
+  window_start_seconds: number.nonnegative(),
+  window_end_seconds: number.nonnegative(),
+  window_source: z.enum(["swing", "whole_clip"]),
+  camera: z.object({
+    declared_view: z.enum(cameraViews),
+    alignment_confirmed: z.boolean(),
+    assessment: z.enum([
+      "user_confirmed",
+      "needs_confirmation",
+      "unsupported_view",
+      "projection_conflict",
+    ]),
+    projection_hint: z.enum(["narrow", "broad", "mixed", "unknown"]),
+    projected_width_torso_ratio: optionalNumber,
+    note: z.string(),
+  }),
+  tracking: z.object({
+    evaluated_frames: number.int().nonnegative(),
+    detected_fraction: number.min(0).max(1),
+    torso_valid_fraction: number.min(0).max(1),
+    wrist_pair_valid_fraction: number.min(0).max(1),
+    full_body_valid_fraction: number.min(0).max(1),
+    border_contact_fraction: number.min(0).max(1),
+    interpolated_fraction: number.min(0).max(1),
+    largest_torso_gap_seconds: number.nonnegative(),
+    largest_wrist_gap_seconds: number.nonnegative(),
+    torso_jump_count: number.int().nonnegative(),
+    keypoint_coverage: z.record(z.enum(landmarkNames), number.min(0).max(1)),
+  }),
+  tempo: gate,
+  posture: gate,
+  issues: z.array(
+    z.object({
+      code: z.string(),
+      severity: z.enum(["info", "warning", "blocking"]),
+      message: z.string(),
+    }),
+  ),
+});
+export type AnalysisQuality = z.infer<typeof analysisQualitySchema>;
+
 export const analysisResponseSchema: z.ZodType<AnalysisResponse> = z.object({
   analysis_id: z.string(),
+  summary_token: z.string().min(1),
   kinematics: z.object({
     version: z.string(),
     status: z.enum(["complete", "partial", "insufficient_data"]),
-    camera_view: z.enum(["down_the_line", "face_on", "unknown"]),
+    camera_view: z.enum(cameraViews),
     events: events.nullable(),
     event_source: z.enum(["manual", "estimated"]).nullable(),
     timing_reliable: z.boolean(),
@@ -148,6 +209,7 @@ export const analysisResponseSchema: z.ZodType<AnalysisResponse> = z.object({
     max_posture_loss_deg: optionalNumber,
     posture_valid_fraction: number.min(0).max(1),
     posture_eligible: z.boolean(),
+    quality: analysisQualitySchema,
     warnings: z.array(z.string()),
     series: z
       .array(
@@ -192,6 +254,8 @@ export const analysisResponseSchema: z.ZodType<AnalysisResponse> = z.object({
         height: number.positive(),
         nominal_fps: number.positive(),
         frame_count: number.int().positive(),
+        source_start_seconds: number.nonnegative().optional(),
+        source_duration_seconds: number.nonnegative().nullable().optional(),
         timestamp_source: z.enum(["decoder_pts", "nominal_fps_fallback"]),
       }),
       frames: z

@@ -60,6 +60,7 @@ regardless of the filename or supplied MIME type.
 ```json
 {
   "camera_view": "down_the_line",
+  "camera_alignment_confirmed": true,
   "events": { "start_seconds": 0.3, "top_seconds": 1.2, "impact_seconds": 1.5 },
   "estimate_events": true,
   "confirm_constant_frame_rate": false,
@@ -67,6 +68,11 @@ regardless of the filename or supplied MIME type.
   "include_pose": true
 }
 ```
+
+Camera views also include `face_on`, `oblique`, `rear`, `overhead`, and `unknown`.
+`camera_alignment_confirmed` defaults to false; only confirm a level, stationary,
+aligned down-the-line camera. Posture values and faults are withheld when the
+view/quality gates do not pass. `kinematics.quality` explains every gate.
 
 All fields are optional. `camera_view` defaults to `unknown`. Markers are seconds
 from the first decoded frame and must satisfy start < top < impact within the clip.
@@ -100,7 +106,7 @@ HTTPS origin and never to the pose worker or generated prompt.
 ```
 
 The abbreviated `vision` object above must be replaced with actual Phase 2 output.
-Responses contain `analysis_id`, `kinematics`, `coaching`, `prompt_payload` and optionally
+Responses contain `analysis_id`, `summary_token`, `kinematics`, `coaching`, `prompt_payload` and optionally
 `pose`. `kinematics.series` is timestamp-aligned for future charts. `pose.frames`
 contains the validated landmark data for overlays. Unused Phase 2 metadata is
 discarded in this API contract. Every response has `Cache-Control: no-store`.
@@ -144,18 +150,24 @@ downswing only. Follow-through standing and single-frame spikes are excluded.
 Coverage must be at least 80%, with no long gap in the usable downswing trace.
 
 The posture rule flags **possible** loss of posture above 10 degrees only with
-a declared down-the-line view. It does not diagnose early extension, pelvis
+a confirmed level/stationary down-the-line view, reviewed manual swing markers,
+and passing tracking/projection checks. It does not diagnose early extension, pelvis
 movement, or a root cause. Camera roll/perspective still affect the result.
 
 Tempo is backswing seconds divided by downswing seconds. The default 2.5–3.5
 reference range is a configurable practice choice, not a universal standard.
 Nominal-FPS timing does not enable tempo screening unless CFR is confirmed.
+Fault screening also requires reviewed manual markers; estimated timings remain
+provisional and do not generate actionable technique/tempo faults.
 
 If no markers are supplied, the heuristic requires a stable initial address,
 a sufficiently large wrist departure and one unambiguous return. Missing wrists,
 multiple cycles or incomplete motion leave events/tempo unknown. Estimated
 impact is a wrist-return proxy and must be confirmed before technique changes.
 The returned wrist speed is torso lengths per second, not clubhead speed.
+
+For detailed tracking gates, the expanded camera contract, and ball-flight plans,
+see [the accuracy roadmap](accuracy-and-ball-flight.md).
 
 ## Operational boundaries
 
@@ -166,9 +178,16 @@ key. It uses a protected Next.js server route; see
 [the frontend guide](phase-4-frontend.md). Browser direct-to-storage uploads and
 user-owned storage policies remain separate integration work.
 
-Default input limit is 100 MiB and 30 seconds; request bodies get an additional
-1 MiB multipart allowance. There are at most four active API requests per analysis
-slot. Extra analyses return 503, rather than forming an unbounded queue. Slots
+Default source upload limit is 250 MiB; request bodies get an additional
+1 MiB multipart allowance. Whole-clip analyses remain limited to 30 seconds.
+Longer sources require `source_start_seconds` and `source_end_seconds` selecting
+a window of at most 30 seconds. Markers are relative to that window; decoded
+source offset metadata aligns the overlay. `POST /api/v1/sessions` combines up to
+eight signed reports without uploading their media again to that endpoint.
+See [multi-video sessions](multi-video-sessions.md) for the complete contract,
+reviewed aggregation rules, export behavior, and 24-hour summary-token lifetime.
+There are at most four active API requests per analysis slot. Extra analyses
+return 503, rather than forming an unbounded queue. Slots
 are per server process; use one API worker or coordinate capacity externally.
 Native decoding/model inference runs in a subprocess, with a wall deadline,
 CPU/file limits on POSIX and an additional address-space cap on Linux. Worker

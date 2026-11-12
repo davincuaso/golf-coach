@@ -38,5 +38,7 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // API routes enforce workspaceAccess themselves. Keep upload streams out of
+  // middleware: Next 15 clones/truncates its request body at 10 MiB by default.
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -7,6 +7,7 @@ import math
 import numpy as np
 from scipy.signal import find_peaks
 
+from app.coaching.quality import assess_quality, usable_point
 from app.coaching.schemas import (
     AnalysisOptions,
     KinematicsReport,
@@ -20,26 +21,15 @@ TORSO = ("left_shoulder", "right_shoulder", "left_hip", "right_hip")
 HANDS_AND_HIPS = ("left_wrist", "right_wrist", *TORSO)
 
 
-def _points(frame: VisionFrame, names: tuple[str, ...]) -> np.ndarray | None:
-    points = []
-    for name in names:
-        joint = frame.landmarks.get(name)
-        if (
-            joint is None
-            or joint.xy_px is None
-            or not joint.observed
-            or joint.interpolated
-            or not joint.filtered
-            or joint.confidence is None
-            or joint.confidence < 0.5
-        ):
-            return None
-        points.append(joint.xy_px)
-    return np.asarray(points, dtype=float)
+def _points(
+    frame: VisionFrame, names: tuple[str, ...], width: int, height: int
+) -> np.ndarray | None:
+    points = [usable_point(frame, name, width, height) for name in names]
+    return None if any(point is None for point in points) else np.asarray(points, dtype=float)
 
 
-def _spine(frame: VisionFrame) -> float:
-    points = _points(frame, TORSO)
+def _spine(frame: VisionFrame, width: int, height: int) -> float:
+    points = _points(frame, TORSO, width, height)
     if points is None:
         return np.nan
     vector = points[:2].mean(axis=0) - points[2:].mean(axis=0)
@@ -49,8 +39,8 @@ def _spine(frame: VisionFrame) -> float:
     return math.degrees(math.acos(float(np.clip(-vector[1] / length, -1, 1))))
 
 
-def _relative_hands(frame: VisionFrame) -> np.ndarray:
-    points = _points(frame, HANDS_AND_HIPS)
+def _relative_hands(frame: VisionFrame, width: int, height: int) -> np.ndarray:
+    points = _points(frame, HANDS_AND_HIPS, width, height)
     if points is None:
         return np.full(2, np.nan)
     hips = points[4:].mean(axis=0)
@@ -121,8 +111,9 @@ def calculate_kinematics(
     document = VisionDocument.model_validate(document)
     options = options or AnalysisOptions()
     times = np.asarray([f.timestamp_seconds for f in document.frames])
-    spine = np.asarray([_spine(frame) for frame in document.frames])
-    hands = np.asarray([_relative_hands(frame) for frame in document.frames])
+    width, height = document.video.width, document.video.height
+    spine = np.asarray([_spine(frame, width, height) for frame in document.frames])
+    hands = np.asarray([_relative_hands(frame, width, height) for frame in document.frames])
     intervals = np.diff(times)
     nominal_dt = 1 / document.video.nominal_fps
     timing_reliable = (
@@ -199,6 +190,25 @@ def calculate_kinematics(
             warnings.append(
                 "Insufficient confident filtered torso landmarks for posture screening."
             )
+    quality = assess_quality(
+        document,
+        options,
+        events=events,
+        event_source=source,
+        timing_reliable=timing_reliable,
+        tempo_available=tempo is not None,
+        posture_available=loss is not None,
+    )
+    eligible = quality.posture.eligible
+    if not eligible:
+        baseline = impact = delta = loss = None
+    if not quality.tempo.eligible:
+        back = down = tempo = None
+    warnings.extend(
+        reason
+        for reason in [*quality.posture.reasons, *quality.tempo.reasons]
+        if reason not in warnings
+    )
     series = [
         SeriesPoint(
             timestamp_seconds=float(t),
@@ -213,7 +223,7 @@ def calculate_kinematics(
         if not np.isfinite(spine).any() and not np.isfinite(hands).any()
         else "partial"
     )
-    if tempo is not None and loss is not None:
+    if tempo is not None and loss is not None and source == "manual":
         status = "complete"
     return KinematicsReport(
         status=status,
@@ -230,6 +240,7 @@ def calculate_kinematics(
         max_posture_loss_deg=_number(loss) if loss is not None else None,
         posture_valid_fraction=round(coverage, 5),
         posture_eligible=eligible,
+        quality=quality,
         warnings=warnings,
         series=series,
     )

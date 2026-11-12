@@ -64,7 +64,7 @@ export function VideoUpload({
             browse files
           </span>
         </span>
-        <small>MP4, MOV, WebM · Up to 30 sec / 100 MB</small>
+        <small>MP4, MOV, WebM · Up to 30 sec / 250 MB</small>
       </button>
       {error && (
         <p className="message message-error" role="alert">

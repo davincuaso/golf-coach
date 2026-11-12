@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { VisionDocument } from "@/lib/api-types";
-import { nearestPoseFrame } from "@/lib/visualization";
+import { nearestPoseFrame, videoPointFromClick } from "@/lib/visualization";
 import { Icon } from "@/components/ui/Icon";
 import { PoseOverlay } from "./PoseOverlay";
 
@@ -10,9 +10,35 @@ interface Props {
   pose: VisionDocument | null;
   onTime: (time: number) => void;
   onDuration: (duration: number | undefined) => void;
+  subjectPoint?: [number, number];
+  onSubjectPoint: (point: [number, number]) => void;
+  disabled: boolean;
+  sourceStartSeconds?: number;
+  sourceEndSeconds?: number;
 }
-export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
+export function SwingVideoPlayer({
+  file,
+  pose,
+  onTime,
+  onDuration,
+  subjectPoint,
+  onSubjectPoint,
+  disabled,
+  sourceStartSeconds = 0,
+  sourceEndSeconds,
+}: Props) {
+  const [selecting, setSelecting] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const analysisStart = pose?.video.source_start_seconds ?? sourceStartSeconds;
+  useEffect(() => {
+    const player = video.current;
+    if (player && player.readyState >= 1) {
+      player.pause();
+      player.currentTime = analysisStart;
+    }
+    setSelecting(false);
+  }, [analysisStart]);
   const [url, setUrl] = useState<string | null>(null);
   const [overlay, setOverlay] = useState(true);
   const [frameIndex, setFrameIndex] = useState(-1);
@@ -28,6 +54,8 @@ export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
     setUrl(next);
     setNativeRatio(null);
     setPlaybackError(false);
+    setSelecting(false);
+    setSelectionError(null);
     setFrameIndex(-1);
     return () => URL.revokeObjectURL(next);
   }, [file]);
@@ -46,7 +74,7 @@ export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
       setFrameIndex(
         nearestPoseFrame(
           pose.frames,
-          time,
+          time - analysisStart,
           Math.max(0.1, 1.5 / pose.video.nominal_fps),
         ),
       );
@@ -68,7 +96,7 @@ export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
       if (callbackId !== undefined)
         element.cancelVideoFrameCallback(callbackId);
     };
-  }, [pose, url]);
+  }, [pose, url, analysisStart]);
   const currentFrame = pose && frameIndex >= 0 ? pose.frames[frameIndex] : null;
   const aligned =
     !pose ||
@@ -109,15 +137,57 @@ export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
                     : undefined,
                 );
                 player.playbackRate = Number(speed);
+                if (analysisStart > 0) player.currentTime = analysisStart;
               }}
               onDurationChange={(event) => {
                 const duration = event.currentTarget.duration;
                 if (Number.isFinite(duration)) onDuration(duration);
               }}
-              onTimeUpdate={(event) => onTime(event.currentTarget.currentTime)}
+              onTimeUpdate={(event) => {
+                onTime(
+                  Math.max(0, event.currentTarget.currentTime - analysisStart),
+                );
+                if (
+                  sourceEndSeconds !== undefined &&
+                  event.currentTarget.currentTime >= sourceEndSeconds
+                )
+                  event.currentTarget.pause();
+              }}
             />
             {overlay && aligned && currentFrame && pose && (
               <PoseOverlay frame={currentFrame} video={pose.video} />
+            )}
+            {selecting && (
+              <button
+                type="button"
+                className="subject-picker"
+                disabled={disabled}
+                aria-label="Select your torso in the first analyzed video frame"
+                onClick={(event) => {
+                  const player = video.current;
+                  if (!player) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const point = videoPointFromClick(
+                    event.clientX - rect.left,
+                    event.clientY - rect.top,
+                    rect.width,
+                    rect.height,
+                    player.videoWidth,
+                    player.videoHeight,
+                  );
+                  if (!point) {
+                    setSelectionError(
+                      "Click inside the video, rather than the surrounding bars.",
+                    );
+                    return;
+                  }
+                  onSubjectPoint(point);
+                  setSelecting(false);
+                  setSelectionError(null);
+                }}
+              >
+                <span>Click inside your torso in the first analyzed frame</span>
+              </button>
             )}
           </>
         ) : (
@@ -169,6 +239,30 @@ export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
           )}
         </div>
         <div className="video-tools">
+          <button
+            type="button"
+            className="overlay-button"
+            disabled={!file || disabled || playbackError}
+            aria-pressed={selecting}
+            onClick={() => {
+              if (selecting) {
+                setSelecting(false);
+                return;
+              }
+              if (video.current) {
+                video.current.pause();
+                video.current.currentTime = analysisStart;
+                onTime(0);
+                setSelecting(true);
+              }
+            }}
+          >
+            {selecting
+              ? "Cancel selection"
+              : subjectPoint
+                ? "Change golfer"
+                : "Select golfer"}
+          </button>
           <label className="speed-select">
             Speed
             <select
@@ -194,6 +288,18 @@ export function SwingVideoPlayer({ file, pose, onTime, onDuration }: Props) {
           </button>
         </div>
       </div>
+      {subjectPoint && (
+        <p className="help-text subject-status" role="status">
+          Golfer selected at {(subjectPoint[0] * 100).toFixed(1)}% from left,{" "}
+          {(subjectPoint[1] * 100).toFixed(1)}% from top in the first analyzed
+          frame.
+        </p>
+      )}
+      {selectionError && (
+        <p className="message message-warning" role="status">
+          {selectionError}
+        </p>
+      )}
       {pose && (
         <details className="pose-details">
           <summary>

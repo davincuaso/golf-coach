@@ -1,8 +1,11 @@
+"use client";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -20,10 +23,20 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <div className="sidebar-label">WORKSPACE</div>
         <nav aria-label="Main navigation" className="main-nav">
-          <Link href="/" className="nav-link active">
+          <Link
+            href="/"
+            className={`nav-link ${pathname === "/" ? "active" : ""}`}
+          >
             <Icon name="grid" />
             Swing Lab
             <Icon name="arrow" className="nav-arrow" width={15} />
+          </Link>
+          <Link
+            href="/sessions"
+            className={`nav-link ${pathname === "/sessions" ? "active" : ""}`}
+          >
+            <Icon name="camera" />
+            Sessions
           </Link>
         </nav>
         <div className="sidebar-bottom">

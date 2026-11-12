@@ -5,7 +5,7 @@ deterministic coaching rules, and ready-to-copy prompts for your own ChatGPT
 conversation. The application does not call a paid AI API.
 
 **Current status:** Phases 1–4 are implemented: pose processing, FastAPI, hybrid
-coaching, and a functional Next.js 15 Swing Lab with capture and coaching prompts.
+coaching, and a functional Next.js 15 Swing Lab with capture, multi-video sessions, and coaching prompts.
 This is a single-tenant workspace. No cloud bucket is provisioned automatically;
 direct-to-bucket uploads and a pro reference library remain future integrations.
 
@@ -15,11 +15,13 @@ direct-to-bucket uploads and a pro reference library remain future integrations.
 - Timestamp-aware Butterworth smoothing, bounded gap interpolation, and JSON export.
 - 2D spine posture measurements, swing tempo, and labelled swing-event estimates.
 - Rule-based posture/tempo observations with evidence and specific practice drills.
+- View-aware measurement gates, per-joint tracking coverage, gap/jump/framing checks.
 - Local, structured ChatGPT prompt generation from metrics, faults, and drills.
 - FastAPI video upload, private Supabase download, and existing-pose coaching routes.
 - Bounded worker processes, upload limits, temporary cleanup, and backend tests.
-- Camera recording, drag/drop upload, video playback and timestamp-aligned pose overlays.
-- Kinematic charts, rule/AI feedback, drills, and credential-free JSON exports.
+- Camera recording, drag/drop upload, click-to-select golfer, and timestamp-aligned pose overlays.
+- Kinematic charts, rule-based feedback, drills, and credential-free JSON exports.
+- Multi-video sessions with source-window selection, linked views, and reviewed summaries.
 - Copy-to-clipboard coaching prompts, an Open ChatGPT link, and a protected server proxy.
 
 The backend uses Python, FastAPI, OpenCV, Ultralytics, NumPy, and SciPy. The
@@ -27,7 +29,7 @@ frontend uses Next.js 15, React 19, TypeScript, Tailwind CSS 4, and Zod.
 
 For the server, configuration, API examples and verification, see
 [Phase 3: FastAPI and hybrid coaching](docs/phase-3-api.md). For the web workspace,
-settings lifecycle, deployment configuration, and file map, see
+prompt workflow, deployment configuration, and file map, see
 [Phase 4: frontend](docs/phase-4-frontend.md).
 
 ## Quick start
@@ -69,9 +71,15 @@ npm run dev -- --hostname 127.0.0.1
 ```
 
 Open `http://127.0.0.1:3000`. Upload or record a swing, choose its camera view,
-and analyze. Copy the AI Coaching Prompt, click Open ChatGPT, and paste it into
+and analyze. For posture screening, confirm a level, stationary down-the-line setup.
+Other angles retain supported timing and descriptive playback; quality checks explain
+why a metric is withheld. Copy the AI Coaching Prompt, click Open ChatGPT, and paste it into
 your conversation. No AI provider key or browser settings page is needed.
 The setup helper links the private backend token without exposing it in the browser.
+For several recordings, open **Sessions**, choose up to eight swing windows, and
+link views of the same physical swing with a shared Swing ID. Sources can be longer
+than 30 seconds; each selected analysis window remains at most 30 seconds.
+See [the multi-video guide](docs/multi-video-sessions.md) for limits and aggregation.
 Keep the backend running in the other terminal. For production, configure a workspace
 password and public origin before `npm run build` / `npm start`; see the frontend guide.
 
@@ -179,6 +187,9 @@ Private videos, generated analyses, model weights, dependencies, build output,
 and real `.env` files are excluded from version control. Download model weights
 locally and supply your own provider/storage configuration.
 
+For the implemented camera/tracking checks and the next ball-flight/launch-monitor
+iterations, see [the accuracy roadmap](docs/accuracy-and-ball-flight.md).
+
 ## Source structure
 
 Generated dependencies, caches and Next build output are omitted below.
@@ -210,12 +221,14 @@ golf-coach/
 │   │   │   ├── __init__.py
 │   │   │   ├── README.md
 │   │   │   ├── kinematics.py
+│   │   │   ├── quality.py
 │   │   │   ├── rule_engine.py
 │   │   │   ├── schemas.py
 │   │   │   └── llm_synthesizer.py
 │   │   ├── services/
 │   │   │   ├── __init__.py
-│   │   │   └── analysis.py
+│   │   │   ├── analysis.py
+│   │   │   └── sessions.py
 │   │   └── vision/
 │   │       ├── __init__.py
 │   │       ├── vision_processor.py
@@ -231,10 +244,14 @@ golf-coach/
 │       ├── test_api.py
 │       ├── test_coaching.py
 │       ├── test_llm_synthesizer.py
+│       ├── test_quality.py
+│       ├── test_sessions.py
 │       ├── test_storage_and_worker.py
 │       └── test_vision_processor.py
 ├── data/.gitkeep
 ├── docs/
+│   ├── accuracy-and-ball-flight.md
+│   ├── multi-video-sessions.md
 │   ├── phase-3-api.md
 │   ├── phase-4-frontend.md
 │   ├── prompt-workflow.md
@@ -249,10 +266,12 @@ golf-coach/
     ├── postcss.config.mjs
     ├── tsconfig.json
     ├── scripts/{configure-local,smoke-web}.mjs
-    ├── tests/{prompt,upload,proxy,visualization}.test.ts
+    ├── tests/{prompt,upload,proxy,session,visualization}.test.ts
     └── src/
         ├── app/
         │   ├── api/v1/analyses/route.ts
+        │   ├── api/v1/sessions/route.ts
+        │   ├── sessions/page.tsx
         │   ├── globals.css
         │   ├── layout.tsx
         │   ├── page.tsx
@@ -264,6 +283,7 @@ golf-coach/
         │   ├── SwingWorkspace.tsx
         │   ├── capture/
         │   ├── analysis/
+        │   ├── session/
         │   └── ui/Icon.tsx
         ├── lib/
         │   ├── api-types.ts
@@ -271,6 +291,7 @@ golf-coach/
         │   ├── capture.ts
         │   ├── clipboard.ts
         │   ├── legacy-settings.ts
+        │   ├── session-client.ts
         │   ├── visualization.ts
         │   ├── workspace-auth.ts
         │   └── server/analysis-proxy.ts

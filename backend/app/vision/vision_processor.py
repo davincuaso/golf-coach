@@ -97,6 +97,8 @@ class VisionConfig:
     image_size: int = 960
     device: str = "cpu"
     subject_point: tuple[float, float] | None = None
+    source_start_seconds: float = 0
+    source_end_seconds: float | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -119,6 +121,20 @@ class VisionConfig:
         for name in ("max_frames", "max_pixels", "max_input_bytes", "image_size"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive.")
+        if (
+            not math.isfinite(self.source_start_seconds)
+            or not 0 <= self.source_start_seconds <= 86_400
+        ):
+            raise ValueError("Source start is invalid.")
+        if self.source_end_seconds is not None and (
+            not math.isfinite(self.source_end_seconds)
+            or not 0
+            < self.source_end_seconds - self.source_start_seconds
+            <= self.max_duration_seconds
+        ):
+            raise ValueError("Source window must fit the analysis duration limit.")
+        if self.source_start_seconds > 0 and self.source_end_seconds is None:
+            raise ValueError("A nonzero source start requires an end.")
         if self.subject_point is not None and (
             len(self.subject_point) != 2
             or any(not math.isfinite(v) or not 0 <= v <= 1 for v in self.subject_point)
@@ -412,6 +428,9 @@ def process_video(
     coordinates, confidences, boxes, pts = [], [], [], []
     tracker = SubjectTracker(config)
     width = height = 0
+    source_origin = 0.0
+    source_duration = None
+    windowed = config.source_end_seconds is not None
     try:
         if not capture.isOpened():
             raise VisionError("OpenCV could not open this video or its codec.")
@@ -420,12 +439,45 @@ def process_video(
         fps = float(capture.get(cv2.CAP_PROP_FPS))
         video_timestamps(np.array([], dtype=np.float64), fps)  # Validate metadata.
         expected_frames = float(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        if math.isfinite(expected_frames) and expected_frames > config.max_frames:
+        source_duration = (
+            expected_frames / fps
+            if math.isfinite(expected_frames) and expected_frames > 0
+            else None
+        )
+        if windowed:
+            if (
+                source_duration is not None
+                and config.source_end_seconds > source_duration + 1 / fps
+            ):
+                raise VisionError("Selected window extends beyond the source video.")
+            if config.source_start_seconds and not capture.set(
+                cv2.CAP_PROP_POS_MSEC, config.source_start_seconds * 1000
+            ):
+                raise VisionError("This video cannot seek to the selected window; trim it first.")
+        if not windowed and math.isfinite(expected_frames) and expected_frames > config.max_frames:
             raise VisionError("Input exceeds the configured frame limit.")
         while True:
             ok, frame = capture.read()
             if not ok:
                 break
+            raw_pts = float(capture.get(cv2.CAP_PROP_POS_MSEC)) / 1000
+            source_frame = float(capture.get(cv2.CAP_PROP_POS_FRAMES)) - 1
+            source_time = (
+                raw_pts
+                if math.isfinite(raw_pts) and (raw_pts > 0 or config.source_start_seconds == 0)
+                else source_frame / fps
+            )
+            if windowed:
+                if not math.isfinite(source_time) or source_time < 0:
+                    raise VisionError(
+                        "Source timing is unavailable; trim this video before analysis."
+                    )
+                if source_time + 1e-6 < config.source_start_seconds:
+                    continue
+                if source_time > config.source_end_seconds + 1e-6:
+                    break
+                if not coordinates:
+                    source_origin = source_time
             index = len(coordinates)
             if index >= config.max_frames or index / fps > config.max_duration_seconds:
                 raise VisionError("Input exceeds the frame or duration limit; trim the clip.")
@@ -461,13 +513,15 @@ def process_video(
             coordinates.append(points)
             confidences.append(scores)
             boxes.append(bbox)
-            pts.append(float(capture.get(cv2.CAP_PROP_POS_MSEC)) / 1000)
+            pts.append(raw_pts)
     finally:
         capture.release()
     if not coordinates:
         raise VisionError("Video contains no decodable frames.")
-    if math.isfinite(expected_frames) and expected_frames - len(coordinates) > max(
-        2, expected_frames * 0.01
+    if (
+        not windowed
+        and math.isfinite(expected_frames)
+        and expected_frames - len(coordinates) > max(2, expected_frames * 0.01)
     ):
         raise VisionError(
             "Decoding ended before the reported frame count; repair or re-encode the video."
@@ -534,6 +588,8 @@ def process_video(
             "frame_count": len(frames),
             "last_frame_timestamp_seconds": round(float(timestamps[-1]), 7),
             "timestamp_source": timestamp_source,
+            "source_start_seconds": source_origin,
+            "source_duration_seconds": source_duration,
             "coordinate_system": "decoded image pixels; origin top-left; x right; y down",
         },
         "processing": {

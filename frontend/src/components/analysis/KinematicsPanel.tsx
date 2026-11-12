@@ -14,9 +14,11 @@ export function MetricCards({ data }: { data: Kinematics | null }) {
       index: "01",
     },
     {
-      label: "SPINE ANGLE CHANGE",
+      label: "POSTURE CHANGE",
       value: formatMetric(data?.spine_delta_deg ?? null, "°"),
-      note: "Impact tilt minus address tilt",
+      note: data?.quality.posture.eligible
+        ? "Impact tilt minus address tilt"
+        : "Needs confirmed view and usable tracking",
       index: "02",
     },
     {
@@ -24,13 +26,15 @@ export function MetricCards({ data }: { data: Kinematics | null }) {
       value: formatMetric(data?.max_posture_loss_deg ?? null, "°"),
       note: data?.posture_eligible
         ? "Largest reduction in forward tilt"
-        : "Requires a down-the-line view",
+        : "Withheld by view / quality checks",
       index: "03",
     },
     {
-      label: "POSTURE COVERAGE",
-      value: data ? `${Math.round(data.posture_valid_fraction * 100)}%` : "—",
-      note: "Frames with usable body landmarks",
+      label: "TORSO TRACKING",
+      value: data
+        ? `${Math.round(data.quality.tracking.torso_valid_fraction * 100)}%`
+        : "—",
+      note: "Usable torso samples in evaluated window",
       index: "04",
     },
   ];
@@ -80,8 +84,8 @@ export function KinematicsPanel({
         <span>S / Start · T / Top · I / Impact</span>
       </div>
       <KinematicsChart
-        title="Spine tilt"
-        description="Projected shoulder-to-hip angle from vertical."
+        title="2D torso projection"
+        description="Projected shoulder-to-hip angle from image vertical. Technique comparisons require the view and quality gates to pass."
         unit="degrees"
         points={data.series.map((point) => ({
           time: point.timestamp_seconds,

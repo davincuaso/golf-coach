@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     pose_device: str = "cpu"
     pose_image_size: int = Field(default=960, ge=320, le=1920)
     filter_cutoff_hz: float = Field(default=8, gt=0, le=100, allow_inf_nan=False)
-    max_video_bytes: int = Field(default=100 * 1024 * 1024, ge=1024, le=500 * 1024 * 1024)
+    max_video_bytes: int = Field(default=250 * 1024 * 1024, ge=1024, le=500 * 1024 * 1024)
     max_result_bytes: int = Field(default=64 * 1024 * 1024, ge=1024)
     worker_timeout_seconds: float = Field(default=180, gt=0, le=900, allow_inf_nan=False)
     worker_memory_mb: int = Field(default=8192, ge=1024, le=65_536)

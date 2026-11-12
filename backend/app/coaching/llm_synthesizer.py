@@ -31,7 +31,9 @@ EVIDENCE RULES
 - Tempo is backswing/downswing duration, not total swing duration. Its reference
   band is a configurable practice choice, not a universal ideal.
 - Wrist speed is torso lengths per second, NOT physical clubhead speed.
-- Respect camera_view, posture_eligible, coverage, nulls, timing_reliable and warnings.
+- Respect camera_view, posture_eligible, quality gates, coverage, nulls, timing_reliable and warnings.
+  A blocked metric is unavailable, not a good result. Never turn a projection hint
+  or user alignment confirmation into a claim of calibrated 3D accuracy.
   Estimated impact is a wrist-return proxy, not measured club-ball contact.
 - A sampled trace can omit gaps and extrema. Base fault/quality decisions on the
   precomputed full-report metrics and rule evidence, not on that preview alone.

@@ -25,7 +25,7 @@ LandmarkName = Literal[
     "left_ankle",
     "right_ankle",
 ]
-CameraView = Literal["down_the_line", "face_on", "unknown"]
+CameraView = Literal["down_the_line", "face_on", "oblique", "rear", "overhead", "unknown"]
 
 
 class StrictModel(BaseModel):
@@ -59,6 +59,8 @@ class VideoMetadata(BaseModel):
     nominal_fps: FiniteFloat = Field(ge=1, le=1000)
     frame_count: int = Field(ge=1, le=12_000)
     timestamp_source: Literal["decoder_pts", "nominal_fps_fallback"]
+    source_start_seconds: FiniteFloat = Field(default=0, ge=0)
+    source_duration_seconds: FiniteFloat | None = Field(default=None, ge=0)
 
 
 class VisionDocument(BaseModel):
@@ -99,14 +101,24 @@ class SwingEvents(StrictModel):
 
 class AnalysisOptions(StrictModel):
     camera_view: CameraView = "unknown"
+    camera_alignment_confirmed: StrictBool = False
     events: SwingEvents | None = None
     estimate_events: StrictBool = True
     confirm_constant_frame_rate: StrictBool = False
     subject_point: tuple[FiniteFloat, FiniteFloat] | None = None
     include_pose: StrictBool = True
+    source_start_seconds: FiniteFloat = Field(default=0, ge=0, le=86_400)
+    source_end_seconds: FiniteFloat | None = Field(default=None, gt=0, le=86_400)
 
     @model_validator(mode="after")
     def valid_subject_point(self):
+        if (
+            self.source_end_seconds is not None
+            and not 0 < self.source_end_seconds - self.source_start_seconds <= 30
+        ):
+            raise ValueError("Choose a source window longer than zero and at most 30 seconds.")
+        if self.source_start_seconds > 0 and self.source_end_seconds is None:
+            raise ValueError("A nonzero source start requires an explicit end.")
         if self.subject_point and any(not 0 <= v <= 1 for v in self.subject_point):
             raise ValueError("Subject coordinates must be in [0, 1].")
         return self
@@ -119,8 +131,57 @@ class SeriesPoint(StrictModel):
     wrist_speed_torso_per_second: float | None
 
 
-class KinematicsReport(StrictModel):
+class MeasurementGate(StrictModel):
+    eligible: bool
+    reasons: list[str]
+
+
+class CameraAssessment(StrictModel):
+    declared_view: CameraView
+    alignment_confirmed: bool
+    assessment: Literal[
+        "user_confirmed", "needs_confirmation", "unsupported_view", "projection_conflict"
+    ]
+    projection_hint: Literal["narrow", "broad", "mixed", "unknown"]
+    projected_width_torso_ratio: float | None
+    note: str
+
+
+class TrackingQuality(StrictModel):
+    evaluated_frames: int
+    detected_fraction: float
+    torso_valid_fraction: float
+    wrist_pair_valid_fraction: float
+    full_body_valid_fraction: float
+    border_contact_fraction: float
+    interpolated_fraction: float
+    largest_torso_gap_seconds: float
+    largest_wrist_gap_seconds: float
+    torso_jump_count: int
+    keypoint_coverage: dict[LandmarkName, float]
+
+
+class QualityIssue(StrictModel):
+    code: str
+    severity: Literal["info", "warning", "blocking"]
+    message: str
+
+
+class AnalysisQuality(StrictModel):
     version: str = "1.0.0"
+    status: Literal["usable", "limited", "insufficient"]
+    window_start_seconds: float
+    window_end_seconds: float
+    window_source: Literal["swing", "whole_clip"]
+    camera: CameraAssessment
+    tracking: TrackingQuality
+    tempo: MeasurementGate
+    posture: MeasurementGate
+    issues: list[QualityIssue]
+
+
+class KinematicsReport(StrictModel):
+    version: str = "1.1.0"
     status: Literal["complete", "partial", "insufficient_data"]
     camera_view: CameraView
     events: SwingEvents | None
@@ -135,6 +196,7 @@ class KinematicsReport(StrictModel):
     max_posture_loss_deg: float | None
     posture_valid_fraction: float
     posture_eligible: bool
+    quality: AnalysisQuality
     warnings: list[str]
     series: list[SeriesPoint]
 
@@ -155,7 +217,7 @@ class Fault(StrictModel):
 
 
 class RuleReport(StrictModel):
-    version: str = "1.0.0"
+    version: str = "1.1.0"
     faults: list[Fault]
     drills: list[Drill]
     notices: list[str]
@@ -163,6 +225,7 @@ class RuleReport(StrictModel):
 
 class AnalysisResponse(StrictModel):
     analysis_id: str
+    summary_token: str = ""
     kinematics: KinematicsReport
     coaching: RuleReport
     prompt_payload: str = Field(min_length=1)
