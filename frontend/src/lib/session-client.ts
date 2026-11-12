@@ -43,6 +43,7 @@ export const sessionResponseSchema = z.object({
   ),
   notices: z.array(z.string()),
   prompt_payload: z.string().min(1),
+  additional_evidence: z.array(z.record(z.unknown())).default([]),
 });
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export interface SessionEntry {
@@ -155,6 +156,7 @@ export async function combineSession(
   entries: SessionEntry[],
   attempted: number,
   signal: AbortSignal,
+  evidenceTokens: string[] = [],
 ): Promise<SessionResponse> {
   const response = await fetch("/api/v1/sessions", {
     method: "POST",
@@ -163,6 +165,7 @@ export async function combineSession(
     cache: "no-store",
     body: JSON.stringify({
       attempted_clips: attempted,
+      evidence_tokens: evidenceTokens,
       clips: entries
         .filter((entry) => entry.analysis)
         .map((entry) => ({

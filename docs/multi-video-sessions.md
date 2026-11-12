@@ -116,10 +116,14 @@ server session database or retrieval endpoint. The frontend's same-origin
 `/api/v1/sessions` proxy applies workspace authentication and keeps bearer auth on
 the server.
 
-## Next stages
+## Additional evidence tools
 
-Add automatic swing segmentation and explicit synchronization/calibration tools,
-then validate against labelled golf footage. Dedicated visible-ball tracking and
-launch-monitor CSV/JSON import remain the next evidence paths; current sessions
-do not measure ball flight, carry, spin, or clubhead speed. See the
+Sessions now include calibrated two-camera reconstruction, user-seeded visible-ball
+candidates, and monitor CSV/JSON or manual shot readings. Refresh the report after
+adding evidence to include signed summaries in the coaching prompt. Save session
+also retains complete 3D/pixel traces. Read [the calibration and shot guide](calibration-and-shot-evidence.md)
+for required capture inputs, units/provenance, intent checks, and limitations.
+
+Automatic swing segmentation, golf-specific detector accuracy validation, calibrated 3D ball flight
+and physical accuracy benchmarks remain future work. See the
 [accuracy and ball-flight plan](accuracy-and-ball-flight.md).

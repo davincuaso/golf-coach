@@ -86,7 +86,16 @@ capturing the **same swing**. Separate swings filmed from different positions do
 not provide a valid stereo reconstruction. A single-view learned 3D estimate must
 be presented with uncertainty and validated for golf-specific positions.
 
-## Next: ball-flight analysis with two evidence paths
+## Implemented evidence tools and remaining ball-flight work
+
+The new Sessions tools implement calibrated two-camera reconstruction, a
+user-seeded appearance candidate tracker, and explicit launch-monitor CSV/JSON
+or manual import with shot-intent checks. See [the setup/measurement guide](calibration-and-shot-evidence.md).
+An experimental downloadable ONNX golf-ball detector is now available; automatic synchronization, calibrated 3D ball flight,
+and hardware validation remain future work. The sections below describe the
+stronger ball-detection/measurement path, not claims about the candidate tracker.
+
+## Ball-flight analysis with two evidence paths
 
 The next module should assess both direction/curve and launch/carry when evidence
 supports them. Define the intended shot first: target line/corridor, target distance,
@@ -134,9 +143,9 @@ causes in the manual ChatGPT prompt.
 Synthetic geometry tests verify the gates, not real-world pose accuracy. Private
 video checks test decoding, portrait orientation, subject continuity, and available
 tracking across views. Manually labelled swing events, calibrated body/ball ground
-truth, and monitor exports are required for an accuracy benchmark. No ball-flight
-detector, measured carry/spin, or monitor integration is shipped in this first
-camera-quality upgrade.
+truth, and monitor exports are required for an accuracy benchmark. A conservative ball candidate tracker and monitor imports are now available;
+an experimental local detector is available but does not infer carry/spin from video. The app does
+not independently verify imported device measurements.
 
 Primary references:
 

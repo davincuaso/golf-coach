@@ -22,6 +22,9 @@ direct-to-bucket uploads and a pro reference library remain future integrations.
 - Camera recording, drag/drop upload, click-to-select golfer, and timestamp-aligned pose overlays.
 - Kinematic charts, rule-based feedback, drills, and credential-free JSON exports.
 - Multi-video sessions with source-window selection, linked views, and reviewed summaries.
+- Calibrated two-camera 3D reconstruction with synchronized, attested pose inputs.
+- Local ONNX golf-ball detection with explicit candidate/loss/ambiguity and camera-motion status.
+- Launch-monitor CSV/JSON and manual readings, unit/provenance retention, and shot-intent checks.
 - Copy-to-clipboard coaching prompts, an Open ChatGPT link, and a protected server proxy.
 
 The backend uses Python, FastAPI, OpenCV, Ultralytics, NumPy, and SciPy. The
@@ -80,6 +83,11 @@ For several recordings, open **Sessions**, choose up to eight swing windows, and
 link views of the same physical swing with a shared Swing ID. Sources can be longer
 than 30 seconds; each selected analysis window remains at most 30 seconds.
 See [the multi-video guide](docs/multi-video-sessions.md) for limits and aggregation.
+The Sessions evidence tools add camera profiles/synchronization, ball candidates,
+and shot readings; follow [the calibration and shot guide](docs/calibration-and-shot-evidence.md).
+For single-camera footage without a launch monitor, install the experimental local
+ball detector with `python backend/scripts/download_ball_model.py`, then restart the
+backend. See [model sources and evaluation](docs/open-source-ball-models.md).
 Keep the backend running in the other terminal. For production, configure a workspace
 password and public origin before `npm run build` / `npm start`; see the frontend guide.
 
@@ -181,7 +189,10 @@ trace sampling, and migration from the former API-key workflow.
 
 Angles are 2D camera projections. Automatic swing markers are labelled estimates,
 and COCO-17 has no club landmarks. The application does not claim measured
-clubhead speed, 3D biomechanics, or a definitive diagnosis from this footage.
+clubhead speed or a definitive diagnosis from this footage. Calibrated 3D requires
+a new synchronized two-camera capture with verified lens/world calibration.
+Ball traces are unconfirmed appearance candidates; physical shot readings come
+from explicitly labelled monitor imports or manual entry.
 
 Private videos, generated analyses, model weights, dependencies, build output,
 and real `.env` files are excluded from version control. Download model weights
@@ -225,6 +236,14 @@ golf-coach/
 │   │   │   ├── rule_engine.py
 │   │   │   ├── schemas.py
 │   │   │   └── llm_synthesizer.py
+│   │   ├── evidence/
+│   │   │   ├── calibration.py
+│   │   │   ├── reconstruction.py
+│   │   │   ├── ball_tracking.py
+│   │   │   ├── ball_detector.py
+│   │   │   ├── launch_monitor.py
+│   │   │   ├── schemas.py
+│   │   │   └── tokens.py
 │   │   ├── services/
 │   │   │   ├── __init__.py
 │   │   │   ├── analysis.py
@@ -236,6 +255,8 @@ golf-coach/
 │   ├── models/README.md
 │   ├── scripts/
 │   │   ├── analyze.py
+│   │   ├── calibrate_camera.py
+│   │   ├── download_ball_model.py
 │   │   ├── init_env.py
 │   │   ├── smoke_api.py
 │   │   └── smoke_pose.py
@@ -251,7 +272,9 @@ golf-coach/
 ├── data/.gitkeep
 ├── docs/
 │   ├── accuracy-and-ball-flight.md
+│   ├── calibration-and-shot-evidence.md
 │   ├── multi-video-sessions.md
+│   ├── open-source-ball-models.md
 │   ├── phase-3-api.md
 │   ├── phase-4-frontend.md
 │   ├── prompt-workflow.md
@@ -271,6 +294,7 @@ golf-coach/
         ├── app/
         │   ├── api/v1/analyses/route.ts
         │   ├── api/v1/sessions/route.ts
+        │   ├── api/v1/{reconstructions,ball-tracks,shot-imports}/route.ts
         │   ├── sessions/page.tsx
         │   ├── globals.css
         │   ├── layout.tsx
@@ -284,6 +308,7 @@ golf-coach/
         │   ├── capture/
         │   ├── analysis/
         │   ├── session/
+        │   ├── evidence/
         │   └── ui/Icon.tsx
         ├── lib/
         │   ├── api-types.ts
@@ -292,6 +317,7 @@ golf-coach/
         │   ├── clipboard.ts
         │   ├── legacy-settings.ts
         │   ├── session-client.ts
+        │   ├── evidence-client.ts
         │   ├── visualization.ts
         │   ├── workspace-auth.ts
         │   └── server/analysis-proxy.ts

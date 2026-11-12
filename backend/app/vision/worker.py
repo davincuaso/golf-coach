@@ -41,9 +41,23 @@ def main() -> int:
 
     try:
         config = VisionConfig(**job["config"])
-        weights = Path(job["weights"])
-        detector = YoloPoseDetector(weights, config)
-        payload = process_video(Path(job["input"]), detector, config)
+        if job.get("ball_options"):
+            from app.evidence.ball_tracking import track_ball
+            from app.evidence.schemas import BallTrackOptions
+            from app.evidence.ball_detector import OnnxGolfBallDetector
+
+            payload = track_ball(
+                Path(job["input"]),
+                BallTrackOptions.model_validate(job["ball_options"]),
+                config.max_input_bytes,
+                OnnxGolfBallDetector(Path(job["ball_model_path"]), job.get("ball_coordinate_units"))
+                if job.get("ball_model_path")
+                else None,
+            ).model_dump(mode="json")
+        else:
+            weights = Path(job["weights"])
+            detector = YoloPoseDetector(weights, config)
+            payload = process_video(Path(job["input"]), detector, config)
         write_json_atomic(payload, Path(job["output"]))
         return 0
     except VisionError:

@@ -20,7 +20,12 @@ export async function proxyAnalysis(
   request: Request,
   env: ProxyEnvironment,
   fetcher: typeof fetch = fetch,
-  mode: "analysis" | "session" = "analysis",
+  mode:
+    | "analysis"
+    | "session"
+    | "reconstruction"
+    | "shot-import"
+    | "ball-track" = "analysis",
 ): Promise<Response> {
   const access = await workspaceAccess(request, env);
   if (access !== "allowed")
@@ -71,8 +76,9 @@ export async function proxyAnalysis(
       "The analysis connection is not configured. Check the server setup guide.",
     );
   const contentType = request.headers.get("content-type") || "";
+  const jsonMode = ["session", "reconstruction", "shot-import"].includes(mode);
   if (
-    !(mode === "session"
+    !(jsonMode
       ? /^application\/json(?:;|$)/i.test(contentType)
       : /^multipart\/form-data;\s*boundary=/i.test(contentType)) ||
     contentType.length > 300 ||
@@ -86,7 +92,12 @@ export async function proxyAnalysis(
     configuredMax > 524288000
   )
     return jsonError(503, "The upload limit is not configured correctly.");
-  const maxBytes = mode === "session" ? 1048576 : configuredMax + 1048576;
+  const maxBytes =
+    mode === "reconstruction"
+      ? 16 * 1048576
+      : jsonMode
+        ? 1048576
+        : configuredMax + 1048576;
   const length = request.headers.get("content-length");
   if (
     length !== null &&
@@ -96,7 +107,13 @@ export async function proxyAnalysis(
   let upstream: URL;
   try {
     upstream = new URL(
-      mode === "session" ? "/api/v1/sessions" : "/api/v1/analyses",
+      {
+        analysis: "/api/v1/analyses",
+        session: "/api/v1/sessions",
+        reconstruction: "/api/v1/reconstructions",
+        "shot-import": "/api/v1/shot-imports",
+        "ball-track": "/api/v1/ball-tracks",
+      }[mode],
       env.GOLF_BACKEND_URL || "http://127.0.0.1:8000",
     );
     if (
@@ -159,7 +176,14 @@ export async function proxyAnalysis(
         403: "The analysis service refused this connection.",
         413: "The video exceeds the configured upload limit.",
         415: "This video format is not supported.",
-        422: "The swing could not be analyzed. Check the clip length, camera view, swing markers, and subject selection.",
+        422:
+          mode === "reconstruction"
+            ? "Check calibration scale/orientation, matching resolution, fixed-camera confirmation, original timing, and synchronization within 10 ms. Reanalyze views created before this update."
+            : mode === "shot-import"
+              ? "Check the import template, one shot per Swing ID, explicit units/methods, numeric ranges, and timezone-aware timestamps."
+              : mode === "ball-track"
+                ? "Check the fixed camera, visible ball seed, seed time, radius, and source analysis."
+                : "The swing could not be analyzed. Check the clip length, camera view, swing markers, and subject selection.",
         503: "Analysis is busy or the pose model is not ready. Try again shortly.",
         504: "Analysis took too long. Try a shorter clip or a smaller pose model.",
       };

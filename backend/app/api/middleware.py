@@ -60,11 +60,11 @@ class RequestGuards:
                     503, "server_busy", "Request capacity is full. Try again shortly."
                 )
 
-        limit = (
-            1024 * 1024
-            if scope["path"] == "/api/v1/sessions"
-            else self.settings.max_video_bytes + 1024 * 1024
-        )
+        limit = {
+            "/api/v1/sessions": 1024 * 1024,
+            "/api/v1/shot-imports": 1024 * 1024,
+            "/api/v1/reconstructions": 16 * 1024 * 1024,
+        }.get(scope["path"], self.settings.max_video_bytes + 1024 * 1024)
         lengths = headers.get(b"content-length", [])
         if len(lengths) > 1 or (lengths and not lengths[0].isdigit()):
             return await reject(400, "invalid_content_length", "Invalid Content-Length header.")

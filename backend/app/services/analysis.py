@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 import json
+import hashlib
 import os
 from pathlib import Path
 import signal
@@ -22,6 +23,12 @@ from app.config import BACKEND_ROOT, Settings
 from app.errors import ServiceError
 from app.storage import VIDEO_SUFFIXES, download_private_video, validate_object_path
 from app.vision.vision_processor import VisionConfig
+from app.evidence.schemas import BallTrackOptions, BallTrackResponse
+
+
+def source_hash(path: Path) -> str:
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 async def _kill_worker(process: asyncio.subprocess.Process) -> None:
@@ -54,9 +61,15 @@ class AnalysisService:
         finally:
             self._slots.release()
 
-    async def _run_worker(self, source: Path, folder: Path, options: AnalysisOptions) -> dict:
+    async def _run_worker(
+        self,
+        source: Path,
+        folder: Path,
+        options: AnalysisOptions,
+        ball: BallTrackOptions | None = None,
+    ) -> dict:
         weights = self.settings.pose_weights.resolve()
-        if not weights.is_file() or weights.suffix.lower() != ".pt":
+        if ball is None and (not weights.is_file() or weights.suffix.lower() != ".pt"):
             raise ServiceError(
                 503, "model_not_ready", "A trusted local pose checkpoint must be configured."
             )
@@ -81,7 +94,18 @@ class AnalysisService:
             "timeout_seconds": self.settings.worker_timeout_seconds,
             "memory_mb": self.settings.worker_memory_mb,
             "result_bytes": self.settings.max_result_bytes,
+            "ball_options": ball.model_dump(mode="json") if ball else None,
         }
+        if ball:
+            ball_path = (
+                self.settings.ball_weights or BACKEND_ROOT / "models" / "golf-ball-yolov8n.onnx"
+            )
+            if self.settings.ball_weights is not None and not ball_path.is_file():
+                raise ServiceError(
+                    503, "ball_model_not_ready", "The configured local ball model is missing."
+                )
+            job["ball_model_path"] = str(ball_path.resolve()) if ball_path.is_file() else None
+            job["ball_coordinate_units"] = self.settings.ball_coordinate_units
         job_path.write_text(json.dumps(job, allow_nan=False))
         # A strict environment allowlist keeps API/service credentials out of the child.
         allowed = (
@@ -149,6 +173,7 @@ class AnalysisService:
         self,
         payload: VisionDocument | dict,
         options: AnalysisOptions,
+        source_digest: str | None = None,
     ) -> AnalysisResponse:
         def compute():
             document = VisionDocument.model_validate(payload)
@@ -167,7 +192,12 @@ class AnalysisService:
         return AnalysisResponse(
             analysis_id=identifier,
             summary_token=sign_analysis(
-                identifier, metrics, rules, self.settings.api_token.get_secret_value()
+                identifier,
+                metrics,
+                rules,
+                self.settings.api_token.get_secret_value(),
+                document,
+                source_digest,
             ),
             kinematics=metrics,
             coaching=rules,
@@ -208,7 +238,9 @@ class AnalysisService:
                 if size == 0:
                     raise ServiceError(422, "empty_video", "The uploaded video is empty.")
                 payload = await self._run_worker(source, folder, options)
-                return await self._finish(payload, options)
+                return await self._finish(
+                    payload, options, await asyncio.to_thread(source_hash, source)
+                )
 
     async def analyze_storage(
         self,
@@ -222,4 +254,36 @@ class AnalysisService:
                 source = folder / ("input" + Path(object_path).suffix.lower())
                 await download_private_video(object_path, source, self.settings)
                 payload = await self._run_worker(source, folder, options)
-                return await self._finish(payload, options)
+                return await self._finish(
+                    payload, options, await asyncio.to_thread(source_hash, source)
+                )
+
+    async def analyze_ball_upload(
+        self, video: UploadFile, options: BallTrackOptions, expected_digest: str
+    ) -> BallTrackResponse:
+        suffix = Path(video.filename or "").suffix.lower()
+        if suffix not in VIDEO_SUFFIXES:
+            raise ServiceError(415, "unsupported_video", "Choose a supported video file.")
+        async with self._slot():
+            with tempfile.TemporaryDirectory(prefix="golf-ball-") as directory:
+                folder = Path(directory)
+                source, size = folder / ("input" + suffix), 0
+                with source.open("xb") as handle:
+                    while chunk := await video.read(1024 * 1024):
+                        size += len(chunk)
+                        if size > self.settings.max_video_bytes:
+                            raise ServiceError(
+                                413, "video_too_large", "Video exceeds the configured byte limit."
+                            )
+                        handle.write(chunk)
+                if not size:
+                    raise ServiceError(422, "empty_video", "The uploaded video is empty.")
+                if await asyncio.to_thread(source_hash, source) != expected_digest:
+                    raise ServiceError(
+                        422,
+                        "source_mismatch",
+                        "The video differs from the analyzed source. Reanalyze this recording.",
+                    )
+                return BallTrackResponse.model_validate(
+                    await self._run_worker(source, folder, AnalysisOptions(), options)
+                )

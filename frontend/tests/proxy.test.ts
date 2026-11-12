@@ -192,3 +192,37 @@ test("session proxy uses its authenticated JSON endpoint and independent body li
   );
   assert.equal(oversized.status, 413);
 });
+test("geometry and shot evidence use fixed authenticated endpoints and separate JSON caps", async () => {
+  for (const [mode, path] of [
+    ["reconstruction", "reconstructions"],
+    ["shot-import", "shot-imports"],
+  ] as const) {
+    const response = await proxyAnalysis(
+      request({ "content-type": "application/json" }, "{}"),
+      env,
+      async (url, init) => {
+        assert.equal(String(url), `http://127.0.0.1:8000/api/v1/${path}`);
+        assert.equal(
+          new Headers(init?.headers).get("authorization"),
+          "Bearer server-token-test-only",
+        );
+        await new Response(init?.body).arrayBuffer();
+        return Response.json({});
+      },
+      mode,
+    );
+    assert.equal(response.status, 200);
+  }
+  const response = await proxyAnalysis(
+    request(
+      { "content-type": "application/json", "content-length": "16777217" },
+      "{}",
+    ),
+    env,
+    async () => {
+      throw Error("must not send");
+    },
+    "reconstruction",
+  );
+  assert.equal(response.status, 413);
+});

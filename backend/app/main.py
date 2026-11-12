@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title="Golf Coach API", version="0.6.0")
+    app = FastAPI(title="Golf Coach API", version="0.7.0")
     app.state.settings = settings
     app.state.analysis_service = AnalysisService(settings)
 
@@ -69,7 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["health"])
     async def health():
-        return {"status": "ok", "version": "0.6.0"}
+        return {"status": "ok", "version": "0.7.0"}
 
     app.include_router(router)
     app.add_middleware(RequestGuards, settings=settings)

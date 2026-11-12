@@ -77,6 +77,12 @@ and withhold conflicting supported views. Automatic markers stay provisional.
 One combined ChatGPT prompt preserves every report’s scalar/quality/rule evidence.
 See [the session guide](multi-video-sessions.md) for limits, provenance, and API details.
 
+The **Movement. Launch. Result.** panel adds calibrated 3D, visible-ball candidate
+tracking and launch-monitor imports/manual readings. Input changes invalidate
+attached evidence. Refresh the combined report to include it in the prompt, then
+save the session to export the full additional traces. See
+[calibration and shot evidence](calibration-and-shot-evidence.md).
+
 ## Manual coaching
 
 Every successful analysis includes `prompt_payload`. The **AI Coaching Prompt**

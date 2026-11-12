@@ -3,6 +3,7 @@
 from pathlib import Path
 from urllib.parse import urlsplit
 import re
+from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +18,8 @@ class Settings(BaseSettings):
     api_token: SecretStr = Field(min_length=24, max_length=512)
     cors_origins: list[str] = ["http://localhost:3000"]
     pose_weights: Path = BACKEND_ROOT / "models" / "yolov8n-pose.pt"
+    ball_weights: Path | None = None
+    ball_coordinate_units: Literal["pixels", "normalized"] | None = None
     pose_device: str = "cpu"
     pose_image_size: int = Field(default=960, ge=320, le=1920)
     filter_cutoff_hz: float = Field(default=8, gt=0, le=100, allow_inf_nan=False)
@@ -41,6 +44,8 @@ class Settings(BaseSettings):
             )
         if not self.pose_weights.is_absolute():
             self.pose_weights = BACKEND_ROOT / self.pose_weights
+        if self.ball_weights is not None and not self.ball_weights.is_absolute():
+            self.ball_weights = BACKEND_ROOT / self.ball_weights
         if not self.cors_origins or "*" in self.cors_origins:
             raise ValueError("Configure explicit browser origins.")
         for origin in self.cors_origins:

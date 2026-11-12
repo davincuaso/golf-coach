@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { EvidenceWorkbench } from "@/components/evidence/EvidenceWorkbench";
+import type { EvidenceArtifact } from "@/lib/evidence-client";
 import { Icon } from "@/components/ui/Icon";
 import { SwingVideoPlayer } from "@/components/analysis/SwingVideoPlayer";
 import { CaptureQualityPanel } from "@/components/analysis/CaptureQualityPanel";
@@ -33,6 +35,11 @@ export function SessionWorkspace() {
   const [entries, setEntries] = useState<SessionEntry[]>([]);
   const [activeId, setActiveId] = useState("");
   const [report, setReport] = useState<SessionResponse | null>(null);
+  const [artifacts, setArtifacts] = useState<EvidenceArtifact[]>([]);
+  const onArtifacts = useCallback((values: EvidenceArtifact[]) => {
+    setArtifacts(values);
+    setReport(null);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +166,12 @@ export function SessionWorkspace() {
   ) => {
     if (!values.some((entry) => entry.analysis))
       throw new Error("No completed clips are available yet.");
-    const result = await combineSession(values, attempted, signal);
+    const result = await combineSession(
+      values,
+      attempted,
+      signal,
+      artifacts.map((item) => item.result.evidence_token),
+    );
     if (mounted.current) setReport(result);
   };
   const analyze = async () => {
@@ -265,6 +277,7 @@ export function SessionWorkspace() {
   const download = () => {
     const data = {
       session: report,
+      additional_evidence_reports: artifacts,
       clips: entries.map((entry, index) => ({
         clip_id: entry.id,
         label: `Video ${index + 1}`,
@@ -638,6 +651,11 @@ export function SessionWorkspace() {
             </span>
           </label>
         )}
+      <EvidenceWorkbench
+        entries={entries}
+        disabled={busy}
+        onArtifacts={onArtifacts}
+      />
       {entries.some((entry) => entry.analysis) && !busy && (
         <button
           className="button button-secondary mt-5"

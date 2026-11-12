@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
         <footer className="app-footer">
           <span>Made for a more intentional practice.</span>
-          <span>2D video analysis · Your swing, your perspective</span>
+          <span>Video analysis · Your swing, your perspective</span>
         </footer>
       </div>
     </div>

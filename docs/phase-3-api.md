@@ -111,6 +111,16 @@ Responses contain `analysis_id`, `summary_token`, `kinematics`, `coaching`, `pro
 contains the validated landmark data for overlays. Unused Phase 2 metadata is
 discarded in this API contract. Every response has `Cache-Control: no-store`.
 
+## Calibrated geometry and shot evidence
+
+Authenticated `/api/v1/reconstructions`, `/api/v1/ball-tracks`, and
+`/api/v1/shot-imports` extend session evidence. Source analyses now sign a pose
+digest and, for uploaded/storage videos, a media digest. Reconstruction rejects
+modified poses; ball tracking rejects a different source file. Signed evidence
+summaries can be included through `evidence_tokens` in `/api/v1/sessions`.
+See [the measurement and setup contract](calibration-and-shot-evidence.md) and
+OpenAPI for typed payloads, separate body caps and capture requirements.
+
 ## Prompt generation workflow
 
 Every successful analysis returns a nonempty `prompt_payload` string, including
