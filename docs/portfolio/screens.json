@@ -1,0 +1,23 @@
+{
+  "status": "source-rendered-captures",
+  "repository": "Golf-Coach",
+  "sourceCommit": "a5e238bca792a2135d57b3b4e2d99a0f319bfc35",
+  "captured": "2026-11-16",
+  "method": "Browser captures of compiled repository components. Not redrawn screens.",
+  "captureAdaptations": [
+    "Static export/base path for HTTPS capture",
+    "Hosting toolbar and source-app analytics excluded"
+  ],
+  "screens": [
+    {
+      "src": "assets/screens/golfcoach/capture-01.webp",
+      "caption": "Swing Lab — before video upload",
+      "label": "Rendered from application source",
+      "portrait": false,
+      "alt": "The actual Golf Coach frontend in its empty upload state. No video analysis or result has been fabricated.",
+      "width": 1280,
+      "height": 900,
+      "sourceCommit": "a5e238bca792a2135d57b3b4e2d99a0f319bfc35"
+    }
+  ]
+}

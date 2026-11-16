@@ -1,7 +1,7 @@
-# Portfolio preview
+# Golf-Coach portfolio captures
 
-![Swing Lab upload workspace](golf-coach-workspace.svg)
+Captured on November 16, 2026 from application source at a5e238bca792a2135d57b3b4e2d99a0f319bfc35.
 
-A source-based reconstruction of the empty Swing Lab workspace, prepared for Davin Cuaso’s portfolio on November 15, 2026. It follows the app shell, swing workspace, capture panel, and frontend styles in this repository. This is an illustrative preview, not a running app or a captured analysis result. No personal videos or measurements are included.
+These are browser screenshots of the real frontend components, not illustrated replicas. This is the empty upload workspace. It does not demonstrate analysis output.
 
-The same SVG is displayed in the Golf Coach project window on the portfolio.
+See screens.json for dimensions, source revision, and capture setup. The prior hand-drawn SVG/PNG previews have been withdrawn because they did not faithfully represent the running interface.
